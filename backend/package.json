@@ -1,0 +1,38 @@
+{
+  "name": "@ggis/backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend del cotizador (API): persistencia, numeración, adjuntos, importación con IA, TRM, reportes. En producción también sirve la web.",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=../.env src/main.ts",
+    "build": "tsup",
+    "start": "node --env-file-if-exists=../.env dist/main.js",
+    "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
+    "@ggis/domain": "*",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "helmet": "^8.0.0",
+    "multer": "^2.0.0",
+    "pino": "^9.6.0",
+    "pino-http": "^10.3.0",
+    "unpdf": "^1.0.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^24.0.0",
+    "@types/supertest": "^6.0.2",
+    "pino-pretty": "^13.0.0",
+    "supertest": "^7.0.0",
+    "tsup": "^8.3.5",
+    "tsx": "^4.19.2"
+  }
+}

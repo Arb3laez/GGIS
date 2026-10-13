@@ -1,0 +1,18 @@
+services:
+  cotizador:
+    build: .
+    image: cotizador-ggis:latest
+    restart: unless-stopped
+    # Solo accesible desde este equipo. Para exponerlo en la red, ponlo detrás de un proxy con autenticación.
+    ports:
+      # Puerto en este equipo: GGIS_PORT (por defecto 4000). Ej: GGIS_PORT=8080 si el 4000 está ocupado.
+      - "127.0.0.1:${GGIS_PORT:-4000}:4000"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5-5}
+      CORS_ORIGINS: http://localhost:${GGIS_PORT:-4000}
+    volumes:
+      - ggis-data:/data
+
+volumes:
+  ggis-data:
