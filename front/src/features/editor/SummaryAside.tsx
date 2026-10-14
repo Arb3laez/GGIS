@@ -102,7 +102,7 @@ export function SummaryAside() {
           </div>
           <div>
             <span>Descuento máx. dejando 15%</span>
-            <b style={{ color: 'var(--accent)' }}>{formatPct(nego.discountKeepingFloorPct)}</b>
+            <b style={{ color: 'var(--accent-text)' }}>{formatPct(nego.discountKeepingFloorPct)}</b>
           </div>
           <div>
             <span>Precio piso</span>
