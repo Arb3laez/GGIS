@@ -1,5 +1,5 @@
 import type { BusinessUnit, LossReason, QuoteStatus } from './constants';
-import type { ApuParams, Bid, ImportedRow, Pricing, QuoteItem, Supply, Terms } from './schemas';
+import type { ApuParams, Bid, ClientInfo, ImportedRow, Pricing, QuoteItem, Supply, Terms } from './schemas';
 
 /**
  * Contratos de la API (lo que viaja entre web y servidor y no es una entidad editable).
@@ -68,6 +68,8 @@ export interface ImportPreview {
 /** Resultado de importar un libro de análisis de precios (APU) de licitación. */
 export interface BidWorkbookImport {
   exchangeRate: number | null;
+  /** Encabezado de la hoja RESUMEN (solo los campos que se encontraron). */
+  client: Partial<Pick<ClientInfo, 'name' | 'project' | 'city'>>;
   apuParams: ApuParams;
   supplies: Supply[];
   items: QuoteItem[];

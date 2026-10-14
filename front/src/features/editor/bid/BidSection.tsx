@@ -30,7 +30,7 @@ export function BidSection() {
       const ok = await confirm({
         title: '¿Aplicar el análisis de precios?',
         message:
-          'Se reemplazan los ítems, insumos, parámetros APU y datos de licitación de esta cotización, y el precio pasa a "AIU licitación". El personal, la M.O. por actividad y los otros costos se vacían: en este método van dentro de la administración.',
+          'Se reemplazan el cliente y proyecto (si vienen en la hoja RESUMEN), los ítems, insumos, parámetros APU y datos de licitación de esta cotización, y el precio pasa a "AIU licitación". El personal, la M.O. por actividad y los otros costos se vacían: en este método van dentro de la administración.',
         details: <ImportSummary r={r} />,
         confirmLabel: 'Aplicar',
         cancelLabel: 'Cancelar',
@@ -39,6 +39,9 @@ export function BidSection() {
       if (!ok) return;
       edit((x) => {
         if (r.exchangeRate) x.exchangeRate = r.exchangeRate;
+        if (r.client.name) x.client.name = r.client.name;
+        if (r.client.project) x.client.project = r.client.project;
+        if (r.client.city) x.client.city = r.client.city;
         x.apuParams = r.apuParams;
         x.supplies = r.supplies;
         x.items = r.items;
@@ -157,6 +160,12 @@ function ImportSummary({ r }: { r: BidWorkbookImport }) {
   const s = r.summary;
   return (
     <>
+      {r.client.name || r.client.project ? (
+        <div>
+          <b>{r.client.name || '(sin cliente)'}</b>
+          {r.client.project ? <div className="muted">{r.client.project}</div> : null}
+        </div>
+      ) : null}
       <div>
         {s.items} ítems ({s.itemsWithApu} con APU, {s.itemsWithSubcontractorPrice} con precio del
         subcontratista)

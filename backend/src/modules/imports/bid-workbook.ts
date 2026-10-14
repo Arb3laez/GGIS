@@ -86,6 +86,36 @@ const priceType = (kind: string): Supply['priceType'] => {
   return 'COP';
 };
 
+/**
+ * Encabezado de la hoja RESUMEN:
+ *   A1 "Proyecto: revisión de precios y oferta económica …"
+ *   A2 "Cliente: Nombre S.A.S. · Licify … · Dirección, Ciudad · Preparado …"
+ */
+export function readSummaryHeader(ws: Sheet | null): BidWorkbookImport['client'] {
+  if (!ws) return {};
+  const client: BidWorkbookImport['client'] = {};
+  const title = str(ws, 'A1', 300);
+  if (title) {
+    const cut = title.search(/:\s*(revisi|oferta|analisis|análisis)/i);
+    client.project = (cut > 0 ? title.slice(0, cut) : title).trim();
+  }
+  const parts = str(ws, 'A2', 1000)
+    .split(/\s+·\s+/)
+    .map((x) => x.trim());
+  for (const part of parts) {
+    const name = /^cliente\s*:\s*(.+)$/i.exec(part);
+    if (name) client.name = name[1]!.trim().slice(0, 200);
+    else if (
+      /#|\b(calle|carrera|cra|cl|avenida|av|diagonal|transversal|km)\b/i.test(part) &&
+      part.includes(',')
+    ) {
+      const city = part.split(',').pop()!.trim();
+      if (city) client.city = city.slice(0, 120);
+    }
+  }
+  return client;
+}
+
 export function readBidWorkbook(data: Buffer): BidWorkbookResult {
   const wb = XLSX.read(data, { type: 'buffer', cellFormula: true });
   const warnings: string[] = [];
@@ -309,6 +339,7 @@ export function readBidWorkbook(data: Buffer): BidWorkbookResult {
 
   return {
     exchangeRate,
+    client: readSummaryHeader(findSheet(wb, 'RESUMEN')),
     apuParams: params,
     supplies,
     items,

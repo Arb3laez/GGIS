@@ -8,6 +8,12 @@ function fakeWorkbook(): Buffer {
   const wb = XLSX.utils.book_new();
   const add = (name: string, rows: unknown[][]) =>
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), name);
+  add('RESUMEN', [
+    ['Edificio Demo – Red de detección: revisión de precios y oferta económica'],
+    [
+      'Cliente: Constructora Ejemplo S.A.S. · Licify inv-000 · Calle 1 # 2-3, Ciudad Demo · Preparado 01-ene-2026',
+    ],
+  ]);
   add('PARAMETROS', [
     ['Parámetros del presupuesto'],
     [],
@@ -99,6 +105,11 @@ describe('readBidWorkbook', () => {
   it('lee parámetros, insumos, APU, revisión, AIU, Licify y aclaraciones', () => {
     const r = readBidWorkbook(fakeWorkbook());
     expect(r.exchangeRate).toBe(4000);
+    expect(r.client).toEqual({
+      name: 'Constructora Ejemplo S.A.S.',
+      project: 'Edificio Demo – Red de detección',
+      city: 'Ciudad Demo',
+    });
     expect(r.apuParams).toEqual({
       importFactor: 1.3,
       wastePct: 5,
