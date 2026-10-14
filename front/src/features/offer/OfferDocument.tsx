@@ -91,14 +91,24 @@ function UnitIcon({ unit }: { unit: BusinessUnit | null }) {
 
 /** Oferta comercial para el cliente. No muestra costos internos ni personal: solo precios de venta. */
 export function OfferDocument({ quote: q, company }: { quote: Quote; company: CompanyProfile }) {
-  const { totals: t, items } = computeQuote(q);
+  const { totals: t, items, aiuAdminPct } = computeQuote(q);
   const validUntil = formatLongDate(addDaysIso(q.issueDate, q.validDays));
   const billable = q.items.map((it, i) => ({ it, b: items[i]! })).filter(({ b }) => b.isBillable);
   const payments = [
     { label: 'Anticipo a la firma de la orden de compra', pct: q.terms.advancePct },
     { label: 'Avance por ejecución de obra (cortes parciales)', pct: q.terms.progressPct },
     { label: 'Contra entrega y recibo a satisfacción', pct: q.terms.onDeliveryPct },
-  ].filter((p) => p.pct > 0);
+  ]
+    .filter((p) => p.pct > 0)
+    // Cuotas al peso; si los % suman 100, la última absorbe el redondeo para que sumen el total exacto.
+    .map((p, i, all) => {
+      const sumPct = all.reduce((s, x) => s + x.pct, 0);
+      const isLast = i === all.length - 1;
+      const before = all.slice(0, i).reduce((s, x) => s + Math.round((t.total * x.pct) / 100), 0);
+      const amount =
+        isLast && Math.abs(sumPct - 100) < 0.001 ? t.total - before : Math.round((t.total * p.pct) / 100);
+      return { ...p, amount };
+    });
   const p = q.pricing;
 
   return (
@@ -123,7 +133,7 @@ export function OfferDocument({ quote: q, company }: { quote: Quote; company: Co
         <div className="od-doc-tag">
           <div className="et">Oferta comercial</div>
           <div className="num">{q.number}</div>
-          <div className="modo">Modalidad {p.method === 'aiu' ? 'AIU' : 'IVA'}</div>
+          <div className="modo">Modalidad {p.method === 'simple' ? 'IVA' : 'AIU'}</div>
         </div>
       </div>
 
@@ -223,7 +233,7 @@ export function OfferDocument({ quote: q, company }: { quote: Quote; company: Co
                 <TotRow label="Subtotal" value={t.subtotal} />
                 {t.aiu ? (
                   <>
-                    <TotRow label={`Administración (${p.aiu.adminPct}%)`} value={t.aiu.admin} />
+                    <TotRow label={`Administración (${aiuAdminPct}%)`} value={t.aiu.admin} />
                     <TotRow label={`Imprevistos (${p.aiu.contingencyPct}%)`} value={t.aiu.contingency} />
                     <TotRow label={`Utilidad (${p.aiu.profitPct}%)`} value={t.aiu.profit} />
                     <TotRow
@@ -270,7 +280,7 @@ export function OfferDocument({ quote: q, company }: { quote: Quote; company: Co
                   <tr key={pay.label}>
                     <td>{pay.label}</td>
                     <td className="pg-pct">{pay.pct}%</td>
-                    <td className="pg-val">{formatCop((t.total * pay.pct) / 100)}</td>
+                    <td className="pg-val">{formatCop(pay.amount)}</td>
                   </tr>
                 ))
               ) : (
@@ -285,6 +295,20 @@ export function OfferDocument({ quote: q, company }: { quote: Quote; company: Co
         <div className="od-legal">
           <Bloque title="Garantía" text={q.terms.warranty} />
           <Bloque title="Exclusiones y comentarios" text={q.terms.exclusions} />
+          {q.bid.clarifications.length ? (
+            <div className="bloque">
+              <div className="bt">Aclaraciones</div>
+              <ol className="bx od-aclaraciones">
+                {q.bid.clarifications.map((c) => (
+                  <li key={c.id}>
+                    <b>{c.topic}</b>
+                    {c.observation ? `: ${c.observation}` : ''}
+                    {c.impact ? <span className="od-impacto"> ({c.impact})</span> : null}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
           <Bloque
             title="Condiciones generales"
             text={`${q.terms.generalConditions} Salvo mención en contrario, la oferta expira automáticamente a los ${q.validDays} días corridos, contados desde la fecha de emisión.`}

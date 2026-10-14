@@ -21,11 +21,16 @@ export function formatCop(n: number | null | undefined): string {
   return (v < 0 ? '-$' : '$') + copFormatter.format(Math.abs(v));
 }
 
-/** Monto abreviado para tarjetas y ejes: $7,8 M · $350 mil · $900. */
+/** Monto abreviado para tarjetas y ejes: $1,2 mil M · $7,8 M · $350 mil · $900. */
 export function formatCopCompact(n: number | null | undefined): string {
   const v = Math.round(n ?? 0);
   const sign = v < 0 ? '-' : '';
   const a = Math.abs(v);
+  if (a >= 1_000_000_000) {
+    // Miles de millones: "$1,2 mil M" (evita leer "$1.245 M" como un millón)
+    const mm = a / 1_000_000_000;
+    return `${sign}$${mm.toLocaleString('es-CO', { maximumFractionDigits: mm >= 10 ? 0 : 1 })} mil M`;
+  }
   if (a >= 1_000_000) {
     const m = a / 1_000_000;
     return `${sign}$${m.toLocaleString('es-CO', { maximumFractionDigits: m >= 100 ? 0 : 1 })} M`;

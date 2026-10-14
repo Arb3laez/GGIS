@@ -35,7 +35,13 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
     ['HOJA DE ANÁLISIS DE COSTOS — DOCUMENTO INTERNO DE AUDITORÍA'],
     [company.legalName],
     [],
-    ['Cotización', quote.number, '', 'Unidad de negocio', quote.businessUnit ? BUSINESS_UNIT_LABELS[quote.businessUnit] : '—'],
+    [
+      'Cotización',
+      quote.number,
+      '',
+      'Unidad de negocio',
+      quote.businessUnit ? BUSINESS_UNIT_LABELS[quote.businessUnit] : '—',
+    ],
     ['Estado', QUOTE_STATUS_LABELS[quote.status], '', 'Modalidad', method],
     ['Cliente', quote.client.name || '—', '', 'Proyecto', quote.client.project || '—'],
     ['Contacto', quote.client.contact || '—', '', 'Ciudad', quote.client.city || '—'],
@@ -51,7 +57,14 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
     ['= COSTO DIRECTO', '', '', '', r(t.directCost), pct(t.directCost)],
     [`6. Pólizas (${p.policiesPct}% sobre costo directo)`, '', '', '', r(t.policies), pct(t.policies)],
     [`7. Impuestos (${p.taxesPct}% sobre costo directo)`, '', '', '', r(t.taxes), pct(t.taxes)],
-    [`8. Financiamiento (${p.financingPct}% sobre costo directo)`, '', '', '', r(t.financing), pct(t.financing)],
+    [
+      `8. Financiamiento (${p.financingPct}% sobre costo directo)`,
+      '',
+      '',
+      '',
+      r(t.financing),
+      pct(t.financing),
+    ],
     [`9. Imprevistos internos (${p.contingencyPct}%)`, '', '', '', r(t.contingency), pct(t.contingency)],
     [`10. Administración interna (${p.adminPct}%)`, '', '', '', r(t.adminCost), pct(t.adminCost)],
     ['= COSTO TOTAL DEL PROYECTO', '', '', '', r(t.totalCost), pct(t.totalCost)],
@@ -61,9 +74,23 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
   if (t.aiu) {
     summary.push(
       [`+ Administración AIU (${p.aiu.adminPct}%)`, '', '', '', r(t.aiu.admin), pct(t.aiu.admin)],
-      [`+ Imprevisto AIU (${p.aiu.contingencyPct}%)`, '', '', '', r(t.aiu.contingency), pct(t.aiu.contingency)],
+      [
+        `+ Imprevisto AIU (${p.aiu.contingencyPct}%)`,
+        '',
+        '',
+        '',
+        r(t.aiu.contingency),
+        pct(t.aiu.contingency),
+      ],
       [`+ Utilidad AIU (${p.aiu.profitPct}%)`, '', '', '', r(t.aiu.profit), pct(t.aiu.profit)],
-      [`+ IVA sobre utilidad (${p.aiu.vatOnProfitPct}%)`, '', '', '', r(t.aiu.vatOnProfit), pct(t.aiu.vatOnProfit)],
+      [
+        `+ IVA sobre utilidad (${p.aiu.vatOnProfitPct}%)`,
+        '',
+        '',
+        '',
+        r(t.aiu.vatOnProfit),
+        pct(t.aiu.vatOnProfit),
+      ],
     );
   } else {
     summary.push([`+ IVA (${p.vatPct}%)`, '', '', '', r(t.vat), pct(t.vat)]);
@@ -77,32 +104,102 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
     ['Costo directo', '', '', '', r(t.directCost)],
     ['Ganancia bruta (total − costo directo)', '', '', '', r(grossProfit)],
     ['Margen bruto sobre venta', '', '', '', pct(grossProfit)],
-    ['Markup sobre costo', '', '', '', t.directCost > 0 ? `${((grossProfit / t.directCost) * 100).toFixed(1)}%` : '—'],
+    [
+      'Markup sobre costo',
+      '',
+      '',
+      '',
+      t.directCost > 0 ? `${((grossProfit / t.directCost) * 100).toFixed(1)}%` : '—',
+    ],
   );
 
   const materials: unknown[][] = [
     ...header('DETALLE DE MATERIALES Y MANO DE OBRA'),
-    ['#', 'Descripción', 'Und', 'Cant', 'Moneda', 'Precio unit. origen', 'TRM', '¿Nac/transp?', '¿IVA?', '% M.O.',
-      'Costo material COP', 'Costo M.O. COP', 'Costo unit. total', 'COSTO TOTAL ÍTEM', 'Venta unit.', 'VENTA TOTAL ÍTEM'],
+    [
+      '#',
+      'Descripción',
+      'Und',
+      'Cant',
+      'Moneda',
+      'Precio unit. origen',
+      'TRM',
+      '¿Nac/transp?',
+      '¿IVA?',
+      '% M.O.',
+      'Costo material COP',
+      'Costo M.O. COP',
+      'Costo unit. total',
+      'COSTO TOTAL ÍTEM',
+      'Venta unit.',
+      'VENTA TOTAL ÍTEM',
+    ],
   ];
   let n = 0;
   quote.items.forEach((it, i) => {
     if (!it.description.trim()) return;
     const b = items[i]!;
     materials.push([
-      ++n, it.description, it.unit, it.quantity, it.currency, it.unitPrice, it.currency === 'USD' ? quote.exchangeRate : '—',
-      it.applyImportCost ? 'Sí' : 'No', it.supplierVatIncluded ? 'Sí' : 'No', `${it.laborPct}%`,
-      r(b.unitMaterialCost), r(b.unitLaborCost), r(b.unitCost), r(b.totalCost), r(b.saleUnitPrice), r(b.saleTotal),
+      ++n,
+      it.description,
+      it.unit,
+      it.quantity,
+      it.currency,
+      it.unitPrice,
+      it.currency === 'USD' ? quote.exchangeRate : '—',
+      it.applyImportCost ? 'Sí' : 'No',
+      it.supplierVatIncluded ? 'Sí' : 'No',
+      `${it.laborPct}%`,
+      r(b.unitMaterialCost),
+      r(b.unitLaborCost),
+      r(b.unitCost),
+      r(b.totalCost),
+      r(b.saleUnitPrice),
+      r(b.saleTotal),
     ]);
   });
-  materials.push([], ['', '', '', '', '', '', '', '', '', 'TOTALES', '', '', '', r(items.reduce((s, b) => s + b.totalCost, 0)), '', r(items.reduce((s, b) => s + b.saleTotal, 0))]);
+  materials.push(
+    [],
+    [
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      'TOTALES',
+      '',
+      '',
+      '',
+      r(items.reduce((s, b) => s + b.totalCost, 0)),
+      '',
+      r(items.reduce((s, b) => s + b.saleTotal, 0)),
+    ],
+  );
 
   const staff: unknown[][] = [
     ...header('PERSONAL FIJO DEL PROYECTO (costo interno — no aparece en la oferta)'),
-    ['Cargo', 'Salario mes', 'Factor prestacional', 'Aux. transporte', 'Valor día', 'Días trabajados', 'Extra/noche', 'COSTO TOTAL'],
+    [
+      'Cargo',
+      'Salario mes',
+      'Factor prestacional',
+      'Aux. transporte',
+      'Valor día',
+      'Días trabajados',
+      'Extra/noche',
+      'COSTO TOTAL',
+    ],
     ...quote.staff.map((m) => [
-      m.role, m.monthlySalary, m.benefitsFactor, m.transportAllowance ? 'Sí' : 'No', r(monthlyLoadedCost(m) / 30), m.days,
-      r(overtimeCost(m)), r(staffMemberCost(m)),
+      m.role,
+      m.monthlySalary,
+      m.benefitsFactor,
+      m.transportAllowance ? 'Sí' : 'No',
+      r(monthlyLoadedCost(m) / 30),
+      m.days,
+      r(overtimeCost(m)),
+      r(staffMemberCost(m)),
     ]),
     [],
     ['', '', '', '', '', '', 'SUBTOTAL PERSONAL', r(t.staff)],
@@ -111,7 +208,13 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
   const others: unknown[][] = [
     ...header('MANO DE OBRA POR ACTIVIDAD Y OTROS COSTOS (costo interno — no aparece en la oferta)'),
     ['Tipo', 'Concepto', 'Cantidad', 'Valor unitario', 'COSTO TOTAL'],
-    ...quote.laborActivities.map((l) => ['M.O. actividad', l.concept, l.quantity, l.unitPrice, r(costLineTotal(l))]),
+    ...quote.laborActivities.map((l) => [
+      'M.O. actividad',
+      l.concept,
+      l.quantity,
+      l.unitPrice,
+      r(costLineTotal(l)),
+    ]),
     ...quote.otherCosts.map((l) => ['Otro costo', l.concept, l.quantity, l.unitPrice, r(costLineTotal(l))]),
     [],
     ['', '', '', 'SUBTOTAL', r(t.laborActivities + t.otherCosts)],
@@ -119,7 +222,13 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
 
   const wb = XLSX.utils.book_new();
   addSheet(wb, 'Resumen auditoría', summary, [44, 16, 4, 22, 18, 12], [4]);
-  addSheet(wb, 'Materiales y M.O.', materials, [4, 44, 6, 7, 8, 16, 8, 10, 7, 7, 16, 14, 15, 17, 16, 17], [10, 11, 12, 13, 14, 15]);
+  addSheet(
+    wb,
+    'Materiales y M.O.',
+    materials,
+    [4, 44, 6, 7, 8, 16, 8, 10, 7, 7, 16, 14, 15, 17, 16, 17],
+    [10, 11, 12, 13, 14, 15],
+  );
   addSheet(wb, 'Personal fijo', staff, [50, 14, 16, 14, 12, 14, 14, 16], [1, 4, 6, 7]);
   addSheet(wb, 'Otros costos', others, [16, 44, 12, 16, 16], [3, 4]);
 

@@ -1,6 +1,13 @@
 import { useState } from 'react';
 import { Calculator, Sparkles } from 'lucide-react';
-import { quoteWarnings, suggestAiu, suggestMargin } from '@ggis/domain';
+import {
+  formatPct,
+  PRICING_METHOD_LABELS,
+  PRICING_METHODS,
+  quoteWarnings,
+  suggestAiu,
+  suggestMargin,
+} from '@ggis/domain';
 import { Alerts } from '../../../shared/feedback';
 import { NumberField } from '../../../shared/inputs';
 import { SectionTitle } from '../../../shared/SectionTitle';
@@ -14,6 +21,7 @@ export function PricingSection() {
   const [marginReasons, setMarginReasons] = useState<string[] | null>(null);
   const [aiuReasons, setAiuReasons] = useState<string[] | null>(null);
   const p = d.pricing;
+  const bidMode = p.method === 'aiu_bid';
   const aiuWarning = quoteWarnings(d, breakdown).filter((w) => w.code === 'aiu-total');
 
   return (
@@ -21,10 +29,12 @@ export function PricingSection() {
       <SectionTitle icon={<Calculator size={16} />} id="pricing-title">
         Precio final
       </SectionTitle>
-      <div className="sub">El resultado se actualiza en vivo en el resumen de la derecha.</div>
+      <div className="sub">
+        El resultado se actualiza en vivo en el resumen de la derecha. {PRICING_METHOD_LABELS[p.method]}.
+      </div>
 
       <div className="method-toggle" role="group" aria-label="Método de precio">
-        {(['simple', 'aiu'] as const).map((m) => (
+        {PRICING_METHODS.map((m) => (
           <button
             key={m}
             type="button"
@@ -32,118 +42,124 @@ export function PricingSection() {
             aria-pressed={p.method === m}
             onClick={() => edit((x) => void (x.pricing.method = m))}
           >
-            {m === 'simple' ? 'Subtotal + IVA' : 'AIU'}
+            {m === 'simple' ? 'Subtotal + IVA' : m === 'aiu' ? 'AIU' : 'AIU licitación'}
           </button>
         ))}
       </div>
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}>
-        <div style={{ flex: 1 }}>
-          <NumberField
-            label="Utilidad sobre el precio de venta (%) — margen, no recargo"
-            value={p.marginPct}
-            onChange={(n) => edit((x) => void (x.pricing.marginPct = Math.min(95, n)))}
-          />
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            const s = suggestMargin(d, breakdown.totals);
-            edit((x) => void (x.pricing.marginPct = s.value));
-            setMarginReasons([`Sugerencia: ${s.value}% de utilidad`, ...s.reasons]);
-          }}
-        >
-          <Sparkles size={15} /> Sugerir
-        </button>
-      </div>
-      <div className="hint" style={{ marginTop: 6 }}>
-        Con 30%, el precio queda calculado para que el 30% del precio de venta sea utilidad (coincide con la
-        columna "Margen" de los ítems).
-      </div>
-      {marginReasons ? <Reasons lines={marginReasons} /> : null}
-
-      <div className="section-title">Costos que se suman antes del subtotal</div>
-      <div className="grid-3">
-        <NumberField
-          label="Pólizas (%)"
-          value={p.policiesPct}
-          onChange={(n) => edit((x) => void (x.pricing.policiesPct = n))}
-        />
-        <NumberField
-          label="Impuestos (%)"
-          value={p.taxesPct}
-          onChange={(n) => edit((x) => void (x.pricing.taxesPct = n))}
-        />
-        <NumberField
-          label="Financiamiento (%)"
-          value={p.financingPct}
-          onChange={(n) => edit((x) => void (x.pricing.financingPct = n))}
-        />
-        <NumberField
-          label="Imprevistos internos (%)"
-          value={p.contingencyPct}
-          onChange={(n) => edit((x) => void (x.pricing.contingencyPct = n))}
-        />
-        <NumberField
-          label="Administración interna (%)"
-          value={p.adminPct}
-          onChange={(n) => edit((x) => void (x.pricing.adminPct = n))}
-        />
-        {p.method === 'simple' ? (
-          <NumberField
-            label="IVA sobre el subtotal (%)"
-            value={p.vatPct}
-            onChange={(n) => edit((x) => void (x.pricing.vatPct = n))}
-          />
-        ) : null}
-      </div>
-
-      {p.method === 'aiu' ? (
+      {bidMode ? (
+        <BidPricing />
+      ) : (
         <>
-          <div className="section-title">AIU para el cliente — independiente de la utilidad interna</div>
-          <div className="grid-2">
-            <NumberField
-              label="Administración (%) — usual 8–15%"
-              value={p.aiu.adminPct}
-              onChange={(n) => edit((x) => void (x.pricing.aiu.adminPct = n))}
-            />
-            <NumberField
-              label="Imprevistos (%) — usual 1–5%"
-              value={p.aiu.contingencyPct}
-              onChange={(n) => edit((x) => void (x.pricing.aiu.contingencyPct = n))}
-            />
-            <NumberField
-              label="Utilidad (%) — usual 3–8%"
-              value={p.aiu.profitPct}
-              onChange={(n) => edit((x) => void (x.pricing.aiu.profitPct = n))}
-            />
-            <NumberField
-              label="IVA sobre la utilidad (%)"
-              value={p.aiu.vatOnProfitPct}
-              onChange={(n) => edit((x) => void (x.pricing.aiu.vatOnProfitPct = n))}
-            />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}>
+            <div style={{ flex: 1 }}>
+              <NumberField
+                label="Utilidad sobre el precio de venta (%) — margen, no recargo"
+                value={p.marginPct}
+                onChange={(n) => edit((x) => void (x.pricing.marginPct = Math.min(95, n)))}
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const s = suggestMargin(d, breakdown.totals);
+                edit((x) => void (x.pricing.marginPct = s.value));
+                setMarginReasons([`Sugerencia: ${s.value}% de utilidad`, ...s.reasons]);
+              }}
+            >
+              <Sparkles size={15} /> Sugerir
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              const s = suggestAiu(d, breakdown.totals);
-              edit((x) => {
-                x.pricing.aiu.adminPct = s.value.adminPct;
-                x.pricing.aiu.contingencyPct = s.value.contingencyPct;
-                x.pricing.aiu.profitPct = s.value.profitPct;
-              });
-              setAiuReasons([
-                `Sugerencia: A ${s.value.adminPct}% · I ${s.value.contingencyPct}% · U ${s.value.profitPct}%`,
-                ...s.reasons,
-              ]);
-            }}
-          >
-            <Sparkles size={15} /> Sugerir AIU
-          </button>
-          {aiuReasons ? <Reasons lines={aiuReasons} /> : null}
-          <Alerts items={aiuWarning} />
+          <div className="hint" style={{ marginTop: 6 }}>
+            Con 30%, el precio queda calculado para que el 30% del precio de venta sea utilidad (coincide con
+            la columna "Margen" de los ítems).
+          </div>
+          {marginReasons ? <Reasons lines={marginReasons} /> : null}
+
+          <div className="section-title">Costos que se suman antes del subtotal</div>
+          <div className="grid-3">
+            <NumberField
+              label="Pólizas (%)"
+              value={p.policiesPct}
+              onChange={(n) => edit((x) => void (x.pricing.policiesPct = n))}
+            />
+            <NumberField
+              label="Impuestos (%)"
+              value={p.taxesPct}
+              onChange={(n) => edit((x) => void (x.pricing.taxesPct = n))}
+            />
+            <NumberField
+              label="Financiamiento (%)"
+              value={p.financingPct}
+              onChange={(n) => edit((x) => void (x.pricing.financingPct = n))}
+            />
+            <NumberField
+              label="Imprevistos internos (%)"
+              value={p.contingencyPct}
+              onChange={(n) => edit((x) => void (x.pricing.contingencyPct = n))}
+            />
+            <NumberField
+              label="Administración interna (%)"
+              value={p.adminPct}
+              onChange={(n) => edit((x) => void (x.pricing.adminPct = n))}
+            />
+            {p.method === 'simple' ? (
+              <NumberField
+                label="IVA sobre el subtotal (%)"
+                value={p.vatPct}
+                onChange={(n) => edit((x) => void (x.pricing.vatPct = n))}
+              />
+            ) : null}
+          </div>
+
+          {p.method === 'aiu' ? (
+            <>
+              <div className="section-title">AIU para el cliente — independiente de la utilidad interna</div>
+              <div className="grid-2">
+                <NumberField
+                  label="Administración (%) — usual 8–15%"
+                  value={p.aiu.adminPct}
+                  onChange={(n) => edit((x) => void (x.pricing.aiu.adminPct = n))}
+                />
+                <NumberField
+                  label="Imprevistos (%) — usual 1–5%"
+                  value={p.aiu.contingencyPct}
+                  onChange={(n) => edit((x) => void (x.pricing.aiu.contingencyPct = n))}
+                />
+                <NumberField
+                  label="Utilidad (%) — usual 3–8%"
+                  value={p.aiu.profitPct}
+                  onChange={(n) => edit((x) => void (x.pricing.aiu.profitPct = n))}
+                />
+                <NumberField
+                  label="IVA sobre la utilidad (%)"
+                  value={p.aiu.vatOnProfitPct}
+                  onChange={(n) => edit((x) => void (x.pricing.aiu.vatOnProfitPct = n))}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const s = suggestAiu(d, breakdown.totals);
+                  edit((x) => {
+                    x.pricing.aiu.adminPct = s.value.adminPct;
+                    x.pricing.aiu.contingencyPct = s.value.contingencyPct;
+                    x.pricing.aiu.profitPct = s.value.profitPct;
+                  });
+                  setAiuReasons([
+                    `Sugerencia: A ${s.value.adminPct}% · I ${s.value.contingencyPct}% · U ${s.value.profitPct}%`,
+                    ...s.reasons,
+                  ]);
+                }}
+              >
+                <Sparkles size={15} /> Sugerir AIU
+              </button>
+              {aiuReasons ? <Reasons lines={aiuReasons} /> : null}
+              <Alerts items={aiuWarning} />
+            </>
+          ) : null}
         </>
-      ) : null}
+      )}
     </section>
   );
 }
@@ -158,5 +174,53 @@ function Reasons({ lines }: { lines: string[] }) {
       ))}
       <div style={{ opacity: 0.75 }}>Puedes ajustarlo a mano.</div>
     </div>
+  );
+}
+
+/** AIU licitación: el precio unitario es el costo directo (APU); A, I y U van encima y el IVA solo sobre la U. */
+function BidPricing() {
+  const d = useDraft();
+  const edit = useEdit();
+  const breakdown = useBreakdown();
+  const p = d.pricing;
+  const computedAdmin = d.bid.adminMode === 'breakdown';
+  return (
+    <>
+      <div className="alert info">
+        Sin utilidad interna ni costos ocultos: pólizas, impuestos y financiación van dentro de la
+        administración. El precio unitario de cada ítem es su costo directo redondeado.
+      </div>
+      <div className="grid-2">
+        {computedAdmin ? (
+          <div className="field">
+            <span>Administración (%) — desglosada en Licitación / APU</span>
+            <div className="num-out" style={{ padding: '8px 0', fontWeight: 700 }}>
+              {formatPct(breakdown.aiuAdminPct)}
+            </div>
+          </div>
+        ) : (
+          <NumberField
+            label="Administración (%)"
+            value={p.aiu.adminPct}
+            onChange={(n) => edit((x) => void (x.pricing.aiu.adminPct = n))}
+          />
+        )}
+        <NumberField
+          label="Imprevistos (%)"
+          value={p.aiu.contingencyPct}
+          onChange={(n) => edit((x) => void (x.pricing.aiu.contingencyPct = n))}
+        />
+        <NumberField
+          label="Utilidad (%)"
+          value={p.aiu.profitPct}
+          onChange={(n) => edit((x) => void (x.pricing.aiu.profitPct = n))}
+        />
+        <NumberField
+          label="IVA sobre la utilidad (%)"
+          value={p.aiu.vatOnProfitPct}
+          onChange={(n) => edit((x) => void (x.pricing.aiu.vatOnProfitPct = n))}
+        />
+      </div>
+    </>
   );
 }

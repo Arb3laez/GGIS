@@ -1,5 +1,7 @@
 import { ITEM_COMPLEXITY_WEIGHT, SUPPLIER_VAT_RATE } from '../constants';
 import type { Pricing, QuoteDraft, QuoteItem } from '../schemas';
+import { computeAdminBreakdown, type AdminBreakdown } from '../bid/admin';
+import { apuContext, computeApu, hasApu, supplyIndex, type ApuBreakdown } from '../bid/apu';
 import { costLinesSubtotal, staffSubtotal } from './labor';
 
 /**
@@ -25,6 +27,12 @@ export interface ItemBreakdown {
   marginPct: number;
   /** Sale en la oferta al cliente (tiene descripción y cantidad). */
   isBillable: boolean;
+  /** Desglose del APU si el ítem se costea con APU; null = costeo simple. */
+  apu: ApuBreakdown | null;
+  /** Costo unitario de suministro (equipos y materiales) — para separar suministro/instalación. */
+  unitSupplyCost: number;
+  /** Costo unitario de instalación (M.O., herramienta, servicios y M.O. fija repartida). */
+  unitInstallCost: number;
 }
 
 export interface AiuBreakdown {
@@ -64,6 +72,10 @@ export interface QuoteTotals {
 
 export interface QuoteBreakdown {
   totals: QuoteTotals;
+  /** Administración desglosada (solo AIU licitación con administración calculada). */
+  adminBreakdown: AdminBreakdown | null;
+  /** % de administración usado en el AIU (manual o calculado). */
+  aiuAdminPct: number;
   items: ItemBreakdown[];
   /** Personal fijo + M.O. por actividad (lo que se puede cargar a ítems marcados). */
   assignableLabor: number;
@@ -123,17 +135,23 @@ export function marginFraction(pricing: Pricing): number {
  * - simple: subtotal + IVA sobre el subtotal.
  * - AIU: subtotal + A + I + U (sobre el subtotal) + IVA solo sobre la U.
  */
-export function finalizeFromSubtotal(subtotal: number, pricing: Pricing): Pick<QuoteTotals, 'vat' | 'aiu' | 'total'> {
+export function finalizeFromSubtotal(
+  subtotal: number,
+  pricing: Pricing,
+  /** true = cada valor se redondea al peso (lo que se factura). */
+  roundToPeso = false,
+): Pick<QuoteTotals, 'vat' | 'aiu' | 'total'> {
+  const r = (x: number) => (roundToPeso ? Math.round(x) : x);
   if (pricing.method === 'simple') {
-    const vat = (subtotal * pricing.vatPct) / 100;
+    const vat = r((subtotal * pricing.vatPct) / 100);
     return { vat, aiu: null, total: subtotal + vat };
   }
   const a = pricing.aiu;
-  const admin = (subtotal * a.adminPct) / 100;
-  const contingency = (subtotal * a.contingencyPct) / 100;
-  const profit = (subtotal * a.profitPct) / 100;
+  const admin = r((subtotal * a.adminPct) / 100);
+  const contingency = r((subtotal * a.contingencyPct) / 100);
+  const profit = r((subtotal * a.profitPct) / 100);
   const aiuSubtotal = subtotal + admin + contingency + profit;
-  const vatOnProfit = (profit * a.vatOnProfitPct) / 100;
+  const vatOnProfit = r((profit * a.vatOnProfitPct) / 100);
   return {
     vat: 0,
     aiu: { admin, contingency, profit, subtotal: aiuSubtotal, vatOnProfit },
@@ -151,50 +169,72 @@ export function computeQuote(draft: QuoteDraft): QuoteBreakdown {
   const carriers = draft.items.filter(carriesLabor);
   const laborPerCarrier = carriers.length > 0 ? assignableLabor / carriers.length : 0;
 
-  // 1) Costos por ítem
+  // 1) Costos por ítem (APU si lo tiene; si no, precio + % M.O.)
+  const supplies = supplyIndex(draft);
+  const apuCtx = apuContext(draft);
   let materials = 0;
   let itemLabor = 0;
   const partial = draft.items.map((item) => {
-    const unitMaterialCost = itemUnitMaterialCost(item, ctx);
-    const unitLaborCost = itemUnitLaborCost(item, ctx);
+    const apu = hasApu(item) ? computeApu(item.apu!, supplies, apuCtx) : null;
+    const unitMaterialCost = apu ? apu.supply : itemUnitMaterialCost(item, ctx);
+    const unitLaborCost = apu ? apu.labor + apu.tools + apu.services : itemUnitLaborCost(item, ctx);
     const assignedFixedLabor = carriesLabor(item) ? laborPerCarrier : 0;
     const totalCost = (unitMaterialCost + unitLaborCost) * item.quantity + assignedFixedLabor;
     materials += unitMaterialCost * item.quantity;
     itemLabor += unitLaborCost * item.quantity;
-    return { item, unitMaterialCost, unitLaborCost, assignedFixedLabor, totalCost };
+    return { item, apu, unitMaterialCost, unitLaborCost, assignedFixedLabor, totalCost };
   });
+  const bidMode = draft.pricing.method === 'aiu_bid';
 
-  // 2) Totales
+  // 2) Totales de costo y precio objetivo (exacto, con decimales)
   const directCost = materials + itemLabor + laborActivities + staff + otherCosts;
-  const oh = overheadsOn(directCost, draft.pricing);
+  // En AIU licitación los indirectos (pólizas, ICA, GMF, financiación) van dentro de la A.
+  const oh = bidMode
+    ? overheadsOn(directCost, {
+        ...draft.pricing,
+        policiesPct: 0,
+        taxesPct: 0,
+        financingPct: 0,
+        contingencyPct: 0,
+        adminPct: 0,
+      })
+    : overheadsOn(directCost, draft.pricing);
   const totalCost = oh.total;
   const m = marginFraction(draft.pricing);
-  const subtotal = totalCost / (1 - m);
-  const profit = subtotal - totalCost;
-  const final = finalizeFromSubtotal(subtotal, draft.pricing);
+  const targetSubtotal = totalCost / (1 - m);
 
-  // 3) Reparto del subtotal entre ítems: los que tienen precio fijado lo conservan; el resto se
-  // reparte el remanente según su costo ponderado por complejidad. La suma cuadra con el subtotal.
+  // 3) Reparto del precio SOLO entre los ítems que salen en la oferta (con descripción y cantidad).
+  // Los que tienen precio fijado lo conservan; el resto se reparte el remanente según su costo
+  // ponderado por complejidad. Los ítems que no salen en la oferta no se llevan parte del precio.
   const hasOverride = (i: QuoteItem) => (i.salePriceOverride ?? 0) > 0;
-  const overrideSum = draft.items
-    .filter(hasOverride)
-    .reduce((s, i) => s + (i.salePriceOverride ?? 0) * i.quantity, 0);
-  const weightOf = (p: (typeof partial)[number]) => p.totalCost * ITEM_COMPLEXITY_WEIGHT[p.item.complexity];
-  const weightedBase = partial.filter((p) => !hasOverride(p.item)).reduce((s, p) => s + weightOf(p), 0);
-  const remainder = subtotal - overrideSum;
+  const billable = partial.filter((p) => isBillable(p.item));
+  const overrideSum = billable
+    .filter((p) => hasOverride(p.item))
+    .reduce((s, p) => s + Math.round(p.item.salePriceOverride ?? 0) * p.item.quantity, 0);
+  const toDistribute = billable.filter((p) => !hasOverride(p.item));
+  // Si los ítems a repartir no tienen costo propio (p. ej. todo el costo es personal), se reparte
+  // en proporción a la cantidad para que el precio quede en las líneas de la oferta.
+  const byCost = toDistribute.some((p) => p.totalCost > 0);
+  const weightOf = (p: (typeof partial)[number]) =>
+    byCost ? p.totalCost * ITEM_COMPLEXITY_WEIGHT[p.item.complexity] : p.item.quantity;
+  const weightedBase = toDistribute.reduce((s, p) => s + weightOf(p), 0);
+  const remainder = targetSubtotal - overrideSum;
 
+  // 4) Facturación: precio unitario en pesos enteros y total de línea = cantidad × unitario, exacto.
   const items: ItemBreakdown[] = partial.map((p) => {
     const { item } = p;
-    const saleTotal = hasOverride(item)
-      ? (item.salePriceOverride ?? 0) * item.quantity
-      : weightedBase > 0
-        ? remainder * (weightOf(p) / weightedBase)
-        : 0;
-    const saleUnitPrice = hasOverride(item)
-      ? (item.salePriceOverride ?? 0)
-      : item.quantity > 0
-        ? saleTotal / item.quantity
-        : 0;
+    const billed = isBillable(item);
+    let saleUnitPrice = 0;
+    if (billed && hasOverride(item)) {
+      saleUnitPrice = Math.round(item.salePriceOverride ?? 0);
+    } else if (billed && bidMode) {
+      // Licitación: el precio unitario de la oferta es el costo directo del ítem (APU), redondeado.
+      saleUnitPrice = Math.round(p.totalCost / item.quantity);
+    } else if (billed && weightedBase > 0) {
+      saleUnitPrice = Math.round((remainder * (weightOf(p) / weightedBase)) / item.quantity);
+    }
+    // Con cantidades decimales (p. ej. metros) el total de la línea se redondea al peso.
+    const saleTotal = billed ? Math.round(saleUnitPrice * item.quantity) : 0;
     const unitCost = item.quantity > 0 ? p.totalCost / item.quantity : p.unitMaterialCost + p.unitLaborCost;
     const marginPct = saleUnitPrice > 0 ? ((saleUnitPrice - unitCost) / saleUnitPrice) * 100 : 0;
     return {
@@ -207,11 +247,31 @@ export function computeQuote(draft: QuoteDraft): QuoteBreakdown {
       saleUnitPrice,
       saleTotal,
       marginPct,
-      isBillable: isBillable(item),
+      isBillable: billed,
+      apu: p.apu,
+      unitSupplyCost: p.unitMaterialCost,
+      unitInstallCost: unitCost - p.unitMaterialCost,
     };
   });
 
+  // 5) El subtotal es la suma de las líneas facturadas: la oferta siempre cuadra a la vista del
+  // cliente. Sin ítems facturables no hay nada que cobrar (la web muestra un aviso).
+  const subtotal = items.reduce((s, i) => s + i.saleTotal, 0);
+
+  // 6) AIU licitación: A (manual o desglosada sobre el costo directo), I y U encima del costo directo.
+  const adminBreakdown =
+    bidMode && draft.bid.adminMode === 'breakdown' ? computeAdminBreakdown(draft.bid, subtotal) : null;
+  const aiuAdminPct = adminBreakdown ? adminBreakdown.pct : draft.pricing.aiu.adminPct;
+  const pricing = bidMode
+    ? { ...draft.pricing, aiu: { ...draft.pricing.aiu, adminPct: aiuAdminPct } }
+    : draft.pricing;
+  const final = finalizeFromSubtotal(subtotal, pricing, true);
+  const costWithAdmin = bidMode ? subtotal + (final.aiu?.admin ?? 0) : totalCost;
+  const profit = bidMode ? (final.aiu?.profit ?? 0) : subtotal - totalCost;
+
   return {
+    adminBreakdown,
+    aiuAdminPct,
     totals: {
       materials,
       itemLabor,
@@ -224,7 +284,7 @@ export function computeQuote(draft: QuoteDraft): QuoteBreakdown {
       financing: oh.financing,
       contingency: oh.contingency,
       adminCost: oh.adminCost,
-      totalCost,
+      totalCost: costWithAdmin,
       profit,
       subtotal,
       ...final,

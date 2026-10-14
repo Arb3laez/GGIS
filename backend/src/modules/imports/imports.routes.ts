@@ -18,7 +18,9 @@ export function importsRouter(imports: ImportsService, upload: Multer): Router {
     limit: 20,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    message: { error: { code: 'rate_limited', message: 'Demasiadas lecturas de documentos. Espera un minuto.' } },
+    message: {
+      error: { code: 'rate_limited', message: 'Demasiadas lecturas de documentos. Espera un minuto.' },
+    },
   });
 
   r.get('/capabilities', (_req, res) => {
@@ -34,6 +36,11 @@ export function importsRouter(imports: ImportsService, upload: Multer): Router {
     if (!req.file) throw badRequest('Falta el archivo (campo "file").');
     const { quoteId } = validate(documentFields, req.body ?? {});
     res.json(await imports.fromDocument(req.file.originalname, req.file.buffer, quoteId));
+  });
+
+  r.post('/bid-workbook', upload.single('file'), (req, res) => {
+    if (!req.file) throw badRequest('Falta el archivo (campo "file").');
+    res.json(imports.fromBidWorkbook(req.file.originalname, req.file.buffer));
   });
 
   r.post('/text', (req, res) => {

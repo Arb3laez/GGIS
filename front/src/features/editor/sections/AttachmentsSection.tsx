@@ -3,6 +3,7 @@ import { Paperclip } from 'lucide-react';
 import { http } from '../../../api/http';
 import { SectionTitle } from '../../../shared/SectionTitle';
 import { keys, useAttachments } from '../../../api/queries';
+import { useConfirm } from '../../../shared/confirm';
 import { errorMessage, useToast } from '../../../shared/feedback';
 import { useEditor } from '../store';
 
@@ -11,6 +12,7 @@ export function AttachmentsSection() {
   const { data } = useAttachments(quoteId);
   const qc = useQueryClient();
   const notify = useToast();
+  const confirm = useConfirm();
   if (!quoteId || !data?.length) return null;
 
   return (
@@ -41,7 +43,19 @@ export function AttachmentsSection() {
                 className="ghost-danger"
                 aria-label={`Eliminar ${a.fileName}`}
                 onClick={async () => {
-                  if (!confirm(`¿Eliminar el adjunto "${a.fileName}"?`)) return;
+                  const ok = await confirm({
+                    title: '¿Eliminar el adjunto?',
+                    message: 'El archivo se borra del servidor y no se puede recuperar.',
+                    details: (
+                      <>
+                        <div>{a.fileName}</div>
+                        <div className="muted">{(a.sizeBytes / 1024).toFixed(0)} KB</div>
+                      </>
+                    ),
+                    confirmLabel: 'Eliminar adjunto',
+                    tone: 'danger',
+                  });
+                  if (!ok) return;
                   try {
                     await http.delete(`/api/attachments/${a.id}`);
                     void qc.invalidateQueries({ queryKey: keys.attachments(quoteId) });

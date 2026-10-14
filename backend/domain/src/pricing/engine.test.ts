@@ -101,7 +101,9 @@ function randomDraft(seed: number): QuoteDraft {
       holidayExtraNight: Math.floor(r() * 10),
     },
   }));
-  d.laborActivities = [{ id: 'a', concept: 'Instalación', quantity: Math.floor(r() * 5), unitPrice: 250_000 }];
+  d.laborActivities = [
+    { id: 'a', concept: 'Instalación', quantity: Math.floor(r() * 5), unitPrice: 250_000 },
+  ];
   d.otherCosts = [{ id: 'b', concept: 'Transporte', quantity: Math.floor(r() * 3), unitPrice: 180_000 }];
   return d;
 }
@@ -117,12 +119,25 @@ describe('computeQuote — paridad con la v68', () => {
     expect(mine.totals.staff).toBeCloseTo(legacy.totals.staff, 4);
     expect(mine.totals.directCost).toBeCloseTo(legacy.totals.costoDirecto, 4);
     expect(mine.totals.totalCost).toBeCloseTo(legacy.totals.costoTotal, 4);
-    expect(mine.totals.subtotal).toBeCloseTo(legacy.totals.subtotal, 4);
-    expect(mine.totals.total).toBeCloseTo(legacy.totals.total, 4);
     mine.items.forEach((it, i) => {
       expect(it.totalCost).toBeCloseTo(legacy.items[i].totalCost, 4);
-      expect(it.saleTotal).toBeCloseTo(legacy.items[i].saleTotal, 4);
     });
+
+    // Facturación (cambio intencional frente a la v68): unitarios enteros y líneas que cuadran.
+    const billable = draft.items.map((it, i) => ({ it, b: mine.items[i]! })).filter((x) => x.b.isBillable);
+    for (const { it, b } of billable) {
+      expect(Number.isInteger(b.saleUnitPrice)).toBe(true);
+      expect(b.saleTotal).toBe(Math.round(b.saleUnitPrice * it.quantity));
+    }
+    expect(mine.totals.subtotal).toBe(mine.items.reduce((s, i) => s + i.saleTotal, 0));
+    expect(Number.isInteger(mine.totals.total)).toBe(true);
+    // Sin precios fijados a mano, el subtotal solo se aparta del precio objetivo por el redondeo.
+    const anyOverride = billable.some(({ it }) => (it.salePriceOverride ?? 0) > 0);
+    const weighted = billable.some(({ b }) => b.totalCost > 0);
+    if (!anyOverride && weighted) {
+      const maxRounding = billable.reduce((s, { it }) => s + 0.5 * it.quantity + 0.5, 0);
+      expect(Math.abs(mine.totals.subtotal - legacy.totals.subtotal)).toBeLessThanOrEqual(maxRounding);
+    }
   });
 });
 
@@ -131,20 +146,40 @@ describe('computeQuote — casos calculados a mano', () => {
     const d = createEmptyDraft();
     d.staff = [];
     d.items = [{ ...blankItem('Cámara', 'UN'), quantity: 2, unitPrice: 100_000, laborPct: 0 }];
-    d.pricing = { ...d.pricing, policiesPct: 0, taxesPct: 0, financingPct: 0, contingencyPct: 0, adminPct: 0, marginPct: 30, vatPct: 19 };
+    d.pricing = {
+      ...d.pricing,
+      policiesPct: 0,
+      taxesPct: 0,
+      financingPct: 0,
+      contingencyPct: 0,
+      adminPct: 0,
+      marginPct: 30,
+      vatPct: 19,
+    };
     const { totals, items } = computeQuote(d);
     expect(totals.directCost).toBe(200_000);
-    expect(totals.subtotal).toBeCloseTo(200_000 / 0.7, 6);
-    expect(totals.profit / totals.subtotal).toBeCloseTo(0.3, 10);
-    expect(totals.total).toBeCloseTo((200_000 / 0.7) * 1.19, 6);
-    expect(items[0]!.marginPct).toBeCloseTo(30, 10);
+    // 285.714,29 / 2 = 142.857,14 → unitario facturado $142.857 y línea $285.714
+    expect(items[0]!.saleUnitPrice).toBe(142_857);
+    expect(totals.subtotal).toBe(285_714);
+    expect(totals.vat).toBe(Math.round(285_714 * 0.19));
+    expect(totals.total).toBe(285_714 + Math.round(285_714 * 0.19));
+    expect(totals.profit / totals.subtotal).toBeCloseTo(0.3, 4);
+    expect(items[0]!.marginPct).toBeCloseTo(30, 3);
   });
 
   it('USD con TRM, nacionalización e IVA del proveedor', () => {
     const d = createEmptyDraft();
     d.exchangeRate = 4000;
     d.importCostPct = 10;
-    const item = { ...blankItem('NVR', 'UN'), quantity: 1, currency: 'USD' as const, unitPrice: 100, applyImportCost: true, supplierVatIncluded: true, laborPct: 20 };
+    const item = {
+      ...blankItem('NVR', 'UN'),
+      quantity: 1,
+      currency: 'USD' as const,
+      unitPrice: 100,
+      applyImportCost: true,
+      supplierVatIncluded: true,
+      laborPct: 20,
+    };
     d.items = [item];
     d.staff = [];
     const { totals } = computeQuote(d);
@@ -157,7 +192,36 @@ describe('computeQuote — casos calculados a mano', () => {
     const d = randomDraft(42);
     const { totals, items } = computeQuote(d);
     const sum = items.reduce((s, i) => s + i.saleTotal, 0);
-    expect(sum).toBeCloseTo(totals.subtotal, 4);
+    expect(sum).toBe(totals.subtotal);
+  });
+
+  it('caso de la captura: 90 und × $13.737 da exactamente $1.236.330', () => {
+    const d = createEmptyDraft();
+    d.staff = [];
+    d.items = [{ ...blankItem('Conector', 'UN'), quantity: 90, unitPrice: 9_000, laborPct: 0 }];
+    const { items } = computeQuote(d);
+    expect(items[0]!.saleTotal).toBe(items[0]!.saleUnitPrice * 90);
+  });
+
+  it('un ítem sin descripción no se lleva parte del precio ni descuadra la oferta', () => {
+    const d = createEmptyDraft();
+    d.staff = [];
+    d.items = [
+      { ...blankItem('Cámara', 'UN'), quantity: 1, unitPrice: 100_000, laborPct: 0 },
+      { ...blankItem('', 'UN'), quantity: 1, unitPrice: 50_000, laborPct: 0 },
+    ];
+    const { totals, items } = computeQuote(d);
+    expect(items[1]!.saleTotal).toBe(0);
+    expect(items[0]!.saleTotal).toBe(totals.subtotal);
+  });
+
+  it('cantidades decimales: el total de la línea se redondea al peso', () => {
+    const d = createEmptyDraft();
+    d.staff = [];
+    d.items = [{ ...blankItem('Cable FPLR', 'ML'), quantity: 2424.22, unitPrice: 3_000, laborPct: 0 }];
+    const { items, totals } = computeQuote(d);
+    expect(Number.isInteger(items[0]!.saleTotal)).toBe(true);
+    expect(totals.subtotal).toBe(items[0]!.saleTotal);
   });
 
   it('precio para un margen objetivo usa los mismos porcentajes', () => {
@@ -175,6 +239,9 @@ describe('nómina', () => {
     m.overtime.extraNight = 4;
     const hour = 2_100_000 / 210;
     expect(overtimeCost(m)).toBeCloseTo(hour * 1.75 * 4 * 1.58, 6);
-    expect(staffMemberCost(m)).toBeCloseTo(((2_100_000 * 1.58 + 249_095) / 30) * 15 + hour * 1.75 * 4 * 1.58, 6);
+    expect(staffMemberCost(m)).toBeCloseTo(
+      ((2_100_000 * 1.58 + 249_095) / 30) * 15 + hour * 1.75 * 4 * 1.58,
+      6,
+    );
   });
 });

@@ -73,7 +73,8 @@ export function createAiExtractor(cfg: { apiKey?: string; model: string }, log: 
   if (!cfg.apiKey) {
     return {
       enabled: false,
-      extract: () => Promise.reject(new AiExtractionError('La extracción con IA no está configurada.', false)),
+      extract: () =>
+        Promise.reject(new AiExtractionError('La extracción con IA no está configurada.', false)),
     };
   }
   const client = new Anthropic({ apiKey: cfg.apiKey, maxRetries: 2, timeout: 120_000 });
@@ -101,7 +102,10 @@ export function createAiExtractor(cfg: { apiKey?: string; model: string }, log: 
           messages: [
             {
               role: 'user',
-              content: [document, { type: 'text', text: 'Extrae los ítems de esta cotización de proveedor.' }],
+              content: [
+                document,
+                { type: 'text', text: 'Extrae los ítems de esta cotización de proveedor.' },
+              ],
             },
           ],
         });
@@ -144,7 +148,11 @@ export function createAiExtractor(cfg: { apiKey?: string; model: string }, log: 
         throw new AiExtractionError('La respuesta de la IA no tuvo el formato esperado.', true);
       }
       log.info(
-        { items: parsed.items.length, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens },
+        {
+          items: parsed.items.length,
+          inputTokens: response.usage.input_tokens,
+          outputTokens: response.usage.output_tokens,
+        },
         'IA: extracción completada',
       );
       return parsed.items

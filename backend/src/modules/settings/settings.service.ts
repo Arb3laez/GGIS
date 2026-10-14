@@ -12,8 +12,7 @@ export class SettingsService {
 
   getCompanyProfile(): CompanyProfile {
     const row = this.db.prepare('SELECT value FROM settings WHERE key = ?').get(COMPANY_KEY) as
-      | { value: string }
-      | undefined;
+      { value: string } | undefined;
     if (!row) return DEFAULT_COMPANY_PROFILE;
     const parsed = companyProfileSchema.safeParse({ ...DEFAULT_COMPANY_PROFILE, ...JSON.parse(row.value) });
     return parsed.success ? parsed.data : DEFAULT_COMPANY_PROFILE;

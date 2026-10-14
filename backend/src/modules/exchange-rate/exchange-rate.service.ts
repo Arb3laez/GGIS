@@ -8,12 +8,16 @@ import type { Logger } from '../../lib/logger';
  * (conjunto abierto en datos.gov.co). Respaldo: tasa de mercado de open.er-api.com.
  * Se cachea en memoria para no consultar en cada clic.
  */
-const OFFICIAL_URL =
-  'https://www.datos.gov.co/resource/32sa-8pi3.json?$order=vigenciadesde%20DESC&$limit=1';
+const OFFICIAL_URL = 'https://www.datos.gov.co/resource/32sa-8pi3.json?$order=vigenciadesde%20DESC&$limit=1';
 const MARKET_URL = 'https://open.er-api.com/v6/latest/USD';
 
-const officialSchema = z.array(z.object({ valor: z.coerce.number().positive(), vigenciadesde: z.string() })).min(1);
-const marketSchema = z.object({ rates: z.object({ COP: z.number().positive() }), time_last_update_unix: z.number() });
+const officialSchema = z
+  .array(z.object({ valor: z.coerce.number().positive(), vigenciadesde: z.string() }))
+  .min(1);
+const marketSchema = z.object({
+  rates: z.object({ COP: z.number().positive() }),
+  time_last_update_unix: z.number(),
+});
 
 export type FetchFn = typeof fetch;
 
@@ -37,7 +41,10 @@ export class ExchangeRateService {
   }
 
   private async getJson(url: string): Promise<unknown> {
-    const res = await this.fetchFn(url, { signal: AbortSignal.timeout(6_000), headers: { accept: 'application/json' } });
+    const res = await this.fetchFn(url, {
+      signal: AbortSignal.timeout(6_000),
+      headers: { accept: 'application/json' },
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
   }
@@ -52,7 +59,10 @@ export class ExchangeRateService {
         fetchedAt: this.now().toISOString(),
       };
     } catch (err) {
-      this.log.warn({ err: (err as Error).message }, 'TRM oficial no disponible; se intenta la tasa de mercado');
+      this.log.warn(
+        { err: (err as Error).message },
+        'TRM oficial no disponible; se intenta la tasa de mercado',
+      );
       return null;
     }
   }

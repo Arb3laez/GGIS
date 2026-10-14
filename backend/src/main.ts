@@ -10,14 +10,20 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 function main() {
   const config = loadConfig();
   // En producción, si no se indica, el front compilado está en front/dist.
-  const webDistDir = config.webDistDir ?? (config.isProduction ? path.resolve(here, '../../front/dist') : undefined);
+  const webDistDir =
+    config.webDistDir ?? (config.isProduction ? path.resolve(here, '../../front/dist') : undefined);
   const log = createLogger(config.logLevel, !config.isProduction);
   const db = openDatabase(config.databaseFile);
   const app = createApp({ config: { ...config, webDistDir }, db, log });
 
   const server = app.listen(config.port, config.host, () => {
     log.info(
-      { url: `http://${config.host}:${config.port}`, data: config.dataDir, ai: !!config.ai.apiKey, web: !!webDistDir },
+      {
+        url: `http://${config.host}:${config.port}`,
+        data: config.dataDir,
+        ai: !!config.ai.apiKey,
+        web: !!webDistDir,
+      },
       'Cotizador GGIS listo',
     );
   });

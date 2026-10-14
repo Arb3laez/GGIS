@@ -61,7 +61,9 @@ export class CatalogService {
         $ts: ts,
       });
     return toItem(
-      this.db.prepare('SELECT * FROM catalog_items WHERE description_key = ?').get(keyOf(entry.description)) as Row,
+      this.db
+        .prepare('SELECT * FROM catalog_items WHERE description_key = ?')
+        .get(keyOf(entry.description)) as Row,
     );
   }
 

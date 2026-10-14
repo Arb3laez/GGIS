@@ -63,4 +63,9 @@ export const migrations: string[] = [
     value TEXT NOT NULL
   );
   `,
+
+  /* v2 — liberar los números de cotizaciones eliminadas (quedan marcadas como anuladas) */ `
+  UPDATE quotes SET number = number || '~anulada-' || substr(id, 1, 8)
+  WHERE deleted_at IS NOT NULL AND number NOT LIKE '%~anulada-%';
+  `,
 ];

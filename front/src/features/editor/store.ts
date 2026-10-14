@@ -1,7 +1,14 @@
 import { useMemo } from 'react';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
-import { computeQuote, createEmptyDraft, quoteDraftSchema, type Quote, type QuoteDraft } from '@ggis/domain';
+import {
+  analyzeBid,
+  computeQuote,
+  createEmptyDraft,
+  quoteDraftSchema,
+  type Quote,
+  type QuoteDraft,
+} from '@ggis/domain';
 
 /**
  * Estado del editor: la cotización que se está editando (borrador) y su identidad en el servidor.
@@ -72,6 +79,13 @@ export const useEdit = () => useEditor((s) => s.edit);
 export function useBreakdown() {
   const draft = useDraft();
   return useMemo(() => computeQuote(draft), [draft]);
+}
+
+/** Análisis de licitación en vivo (revisión del subcontratista, topes, Licify). */
+export function useBidAnalysis() {
+  const draft = useDraft();
+  const breakdown = useBreakdown();
+  return useMemo(() => analyzeBid(draft, breakdown), [draft, breakdown]);
 }
 
 // ---------- Borrador local (comodidad por navegador, no es el almacenamiento real) ----------

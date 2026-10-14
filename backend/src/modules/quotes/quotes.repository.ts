@@ -1,4 +1,11 @@
-import type { BusinessUnit, LossReason, QuoteDraft, QuoteStatus, QuoteSummary } from '@ggis/domain';
+import {
+  quoteDraftSchema,
+  type BusinessUnit,
+  type LossReason,
+  type QuoteDraft,
+  type QuoteStatus,
+  type QuoteSummary,
+} from '@ggis/domain';
 import type { Database } from '../../db/database';
 
 /** Cotización tal como se guarda: metadatos + el borrador completo en JSON. */
@@ -18,6 +25,12 @@ export interface QuoteListFilter {
 }
 
 type Row = Record<string, string | number | null>;
+
+/** Completa campos agregados en versiones nuevas; si algo no valida, devuelve lo guardado tal cual. */
+function withDefaults(raw: unknown): QuoteDraft {
+  const parsed = quoteDraftSchema.safeParse(raw);
+  return parsed.success ? parsed.data : (raw as QuoteDraft);
+}
 
 const SUMMARY_COLUMNS = `id, number, client_name, project_name, issue_date, valid_days, status, business_unit,
   loss_reason, next_follow_up, total, budgeted_cost, actual_cost, actual_sale, closed_on, updated_at`;
@@ -81,14 +94,18 @@ export class QuotesRepository {
       params.$q = `%${filter.search.replace(/[%_]/g, '')}%`;
     }
     const rows = this.db
-      .prepare(`SELECT ${SUMMARY_COLUMNS} FROM quotes WHERE ${where.join(' AND ')} ORDER BY created_at DESC`)
+      .prepare(
+        `SELECT ${SUMMARY_COLUMNS} FROM quotes WHERE ${where.join(' AND ')} ORDER BY issue_date DESC, number DESC`,
+      )
       .all(params) as Row[];
     return rows.map(toSummary);
   }
 
   findById(id: string): QuoteRecord | null {
     const r = this.db
-      .prepare('SELECT id, number, version, created_at, updated_at, data FROM quotes WHERE id = ? AND deleted_at IS NULL')
+      .prepare(
+        'SELECT id, number, version, created_at, updated_at, data FROM quotes WHERE id = ? AND deleted_at IS NULL',
+      )
       .get(id) as Row | undefined;
     if (!r) return null;
     return {
@@ -97,7 +114,8 @@ export class QuotesRepository {
       version: Number(r.version),
       createdAt: String(r.created_at),
       updatedAt: String(r.updated_at),
-      draft: JSON.parse(String(r.data)) as QuoteDraft,
+      // Se valida y completa con los valores por defecto de campos agregados en versiones nuevas.
+      draft: withDefaults(JSON.parse(String(r.data))),
     };
   }
 
@@ -143,12 +161,31 @@ export class QuotesRepository {
     return Number(result.changes) === 1;
   }
 
-  /** Borrado lógico: la cotización deja de listarse pero queda para auditoría. */
+  /**
+   * Borrado lógico: la cotización deja de listarse pero queda para auditoría. Su número se marca
+   * como anulado (OT-0001~anulada-1a2b3c4d) para liberarlo: así una importación puede volver a usarlo.
+   */
   softDelete(id: string, at: string): boolean {
     const result = this.db
-      .prepare('UPDATE quotes SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL')
+      .prepare(
+        `UPDATE quotes SET deleted_at = ?, number = number || '~anulada-' || substr(id, 1, 8)
+         WHERE id = ? AND deleted_at IS NULL`,
+      )
       .run(at, id);
     return Number(result.changes) === 1;
+  }
+
+  /** Actualiza solo las columnas del listado (no cambia versión ni fecha de modificación). */
+  updateSummary(id: string, summary: QuoteSummary): void {
+    this.db
+      .prepare(
+        `UPDATE quotes SET status = $status, business_unit = $business_unit, client_name = $client_name,
+           project_name = $project_name, issue_date = $issue_date, valid_days = $valid_days, loss_reason = $loss_reason,
+           next_follow_up = $next_follow_up, total = $total, budgeted_cost = $budgeted_cost, actual_cost = $actual_cost,
+           actual_sale = $actual_sale, closed_on = $closed_on
+         WHERE id = $id`,
+      )
+      .run({ $id: id, ...summaryParams(summary) });
   }
 
   numberExists(number: string): boolean {
@@ -169,14 +206,12 @@ export class QuotesRepository {
 
   /** Asegura que el consecutivo quede por encima de un número ya usado (al importar). */
   bumpCounterTo(value: number): void {
-    this.db
-      .prepare("UPDATE counters SET value = MAX(value, ?) WHERE name = 'quote_number'")
-      .run(value);
+    this.db.prepare("UPDATE counters SET value = MAX(value, ?) WHERE name = 'quote_number'").run(value);
   }
 
   listAllIds(): string[] {
-    return (this.db.prepare('SELECT id FROM quotes WHERE deleted_at IS NULL ORDER BY created_at').all() as Row[]).map(
-      (r) => String(r.id),
-    );
+    return (
+      this.db.prepare('SELECT id FROM quotes WHERE deleted_at IS NULL ORDER BY created_at').all() as Row[]
+    ).map((r) => String(r.id));
   }
 }

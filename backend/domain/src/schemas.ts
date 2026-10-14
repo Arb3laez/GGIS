@@ -8,6 +8,8 @@ import {
   PRICING_METHODS,
   QUOTE_STATUSES,
   SOLUTIONS,
+  SUPPLY_PRICE_TYPES,
+  SUPPLY_TYPES,
 } from './constants';
 
 /**
@@ -48,6 +50,13 @@ export const quoteItemSchema = z.object({
   complexity: complexitySchema,
   /** Precio de venta unitario fijado a mano; null = se calcula. */
   salePriceOverride: z.number().finite().positive().nullable(),
+  /**
+   * Análisis de precio unitario. Si tiene líneas, el costo del ítem sale del APU (y se ignoran
+   * precio unitario, % M.O., nacionalización e IVA del proveedor). null = costeo simple.
+   */
+  apu: z.array(z.lazy(() => apuLineSchema)).max(60).nullable().default(null),
+  /** Precio unitario que ofrece el subcontratista para este ítem (para la revisión). */
+  subcontractorUnitPrice: z.number().finite().min(0).nullable().default(null),
 });
 
 export const overtimeHoursSchema = z.object({
@@ -142,6 +151,83 @@ export const clientSchema = z.object({
 });
 
 /** Todo lo que el usuario edita de una cotización. */
+// ---------------------------------------------------------------------------
+// APU y licitación
+// ---------------------------------------------------------------------------
+
+export const supplySchema = z.object({
+  id,
+  /** Código corto del insumo (EQ01, MA03, MO01…). */
+  code: z.string().trim().min(1).max(20),
+  description: text(300),
+  unit: text(20),
+  type: z.enum(SUPPLY_TYPES),
+  /** Valor tal como viene de la fuente (USD, COP o lista). */
+  baseValue: money,
+  priceType: z.enum(SUPPLY_PRICE_TYPES),
+  /** De dónde sale el precio (cotización, lista, página web…). */
+  source: text(300),
+  /** Precio estimado: hay que verificarlo/cotizarlo antes de adjudicar. */
+  estimated: z.boolean(),
+});
+
+export const apuLineSchema = z.object({
+  id,
+  supplyId: id,
+  /** Cantidad por unidad del ítem (si no hay rendimiento). */
+  quantity: money,
+  /** Rendimiento en unidades del ítem por día; si es > 0, la cantidad efectiva es 1 / rendimiento. */
+  yieldPerDay: money,
+  /** Aplica el % de desperdicio de los parámetros (tubería, cable, coraza). */
+  applyWaste: z.boolean(),
+});
+
+export const apuParamsSchema = z.object({
+  /** Factor sobre precios en USD: flete, arancel y nacionalización. */
+  importFactor: z.number().finite().min(1).max(5).default(1.3),
+  /** % de desperdicio para las líneas marcadas. */
+  wastePct: pct.default(5),
+  /** Factor para actualizar listas de precios antiguas. */
+  escalationFactor: z.number().finite().min(0.5).max(5).default(1.05),
+  /** Herramienta menor y equipo como % de la mano de obra del APU. */
+  toolsPctOfLabor: pct.default(5),
+});
+
+const adminPersonSchema = z.object({
+  id,
+  role: text(200),
+  monthlyCost: money,
+  dedicationPct: pct,
+  /** Meses que se cobra: todo el contrato o solo los meses con personal en campo. */
+  period: z.enum(['contract', 'field']),
+});
+const adminExpenseSchema = z.object({ id, concept: text(200), value: money });
+const adminIndirectSchema = z.object({ id, concept: text(200), pct });
+const clarificationSchema = z.object({ id, topic: text(200), observation: text(2_000), impact: text(1_000) });
+
+export const bidSchema = z.object({
+  /** Plazo total del contrato (meses). */
+  contractMonths: z.number().finite().min(0).max(120).default(3),
+  /** Meses con personal en campo. */
+  fieldMonths: z.number().finite().min(0).max(120).default(2),
+  /** manual = % de administración escrito a mano; breakdown = calculado desde el desglose. */
+  adminMode: z.enum(['manual', 'breakdown']).default('manual'),
+  adminPersonnel: z.array(adminPersonSchema).max(50).default([]),
+  adminExpenses: z.array(adminExpenseSchema).max(50).default([]),
+  adminIndirects: z.array(adminIndirectSchema).max(30).default([]),
+  /** Topes del pliego sobre el valor sin IVA. */
+  caps: z
+    .object({
+      enabled: z.boolean().default(false),
+      materialsMaxPct: pct.default(50),
+      laborMaxPct: pct.default(25),
+      adminMaxPct: pct.default(15),
+    })
+    .default({}),
+  subcontractorName: text(200).default(''),
+  clarifications: z.array(clarificationSchema).max(100).default([]),
+});
+
 export const quoteDraftSchema = z.object({
   status: quoteStatusSchema,
   lossReason: lossReasonSchema.nullable(),
@@ -163,6 +249,10 @@ export const quoteDraftSchema = z.object({
   pricing: pricingSchema,
   terms: termsSchema,
   closure: closureSchema,
+  /** Base de insumos de esta cotización (para los APU). */
+  supplies: z.array(supplySchema).max(1_000).default([]),
+  apuParams: apuParamsSchema.default({}),
+  bid: bidSchema.default({}),
 });
 
 export const quoteSchema = quoteDraftSchema.extend({
@@ -211,6 +301,10 @@ export const companyProfileSchema = z.object({
 });
 
 export type QuoteItem = z.infer<typeof quoteItemSchema>;
+export type Supply = z.infer<typeof supplySchema>;
+export type ApuLine = z.infer<typeof apuLineSchema>;
+export type ApuParams = z.infer<typeof apuParamsSchema>;
+export type Bid = z.infer<typeof bidSchema>;
 export type OvertimeHours = z.infer<typeof overtimeHoursSchema>;
 export type StaffMember = z.infer<typeof staffMemberSchema>;
 export type CostLine = z.infer<typeof costLineSchema>;

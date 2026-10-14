@@ -181,16 +181,10 @@
 }
 .od-resumen .r-item:last-child {
   border-right: none;
-  background: var(--tinta);
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
 }
 .od-resumen .r-item:last-child .r-v {
-  color: var(--amarillo);
   font-size: 15px;
-}
-.od-resumen .r-item:last-child .r-k {
-  color: #b7c4ce;
+  font-weight: 800;
 }
 .od-resumen .r-k {
   font-size: 8px;
@@ -278,7 +272,7 @@
 .od-items .c-vu {
   text-align: right;
   font-family: inherit;
-  color: var(--gris);
+  color: var(--tinta);
 }
 .od-items .c-vt {
   text-align: right;
@@ -297,35 +291,36 @@
   width: 100%;
   border-collapse: collapse;
 }
+/* Totales con formato de factura: texto oscuro sobre blanco, total en negrita */
 .od-tot .bk-lbl {
-  padding: 5px 10px;
+  padding: 6px 10px;
   font-size: 11px;
-  color: var(--gris);
+  color: var(--tinta);
+  border-bottom: 1px solid var(--linea);
 }
 .od-tot .bk-val {
-  padding: 5px 10px;
+  padding: 6px 10px;
   text-align: right;
   font-family: inherit;
   font-size: 11px;
+  color: var(--tinta);
+  border-bottom: 1px solid var(--linea);
 }
 .od-tot .total-row td {
-  background: var(--tinta);
-  color: #fff;
-  font-weight: 700;
+  color: var(--tinta);
+  font-weight: 800;
   padding: 10px;
   font-size: 13px;
-  -webkit-print-color-adjust: exact;
-  print-color-adjust: exact;
+  border-top: 2px solid var(--tinta);
+  border-bottom: 2px solid var(--tinta);
 }
 .od-tot .total-row .bk-lbl {
-  color: #fff;
   letter-spacing: 1px;
   text-transform: uppercase;
-  font-size: 11px;
+  font-size: 11.5px;
 }
 .od-tot .total-row .bk-val {
-  color: var(--amarillo);
-  font-size: 16px;
+  font-size: 15px;
 }
 .od-sec {
   margin-top: 22px;
@@ -497,4 +492,14 @@
     size: A4;
     margin: 12mm;
   }
+}
+.od-aclaraciones {
+  margin: 0;
+  padding-left: 18px;
+}
+.od-aclaraciones li + li {
+  margin-top: 3px;
+}
+.od-aclaraciones .od-impacto {
+  color: #6b6a64;
 }

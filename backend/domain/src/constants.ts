@@ -62,11 +62,50 @@ export const LOSS_REASON_LABELS: Record<LossReason, string> = {
   other: 'Otro',
 };
 
-export const PRICING_METHODS = ['simple', 'aiu'] as const;
+export const PRICING_METHODS = ['simple', 'aiu', 'aiu_bid'] as const;
 export type PricingMethod = (typeof PRICING_METHODS)[number];
 export const PRICING_METHOD_LABELS: Record<PricingMethod, string> = {
   simple: 'Subtotal + IVA',
   aiu: 'AIU',
+  aiu_bid: 'AIU licitación (precio = costo directo)',
+};
+
+// ---------------------------------------------------------------------------
+// Análisis de precios unitarios (APU) y licitaciones
+// ---------------------------------------------------------------------------
+
+/** Tipo de insumo del APU. EQ = equipo, MAT = material, MO = mano de obra, SV = servicio. */
+export const SUPPLY_TYPES = ['EQ', 'MAT', 'MO', 'SV'] as const;
+export type SupplyType = (typeof SUPPLY_TYPES)[number];
+export const SUPPLY_TYPE_LABELS: Record<SupplyType, string> = {
+  EQ: 'Equipo',
+  MAT: 'Material',
+  MO: 'Mano de obra',
+  SV: 'Servicio',
+};
+
+/**
+ * Origen del valor base del insumo:
+ * COP = precio en pesos · USD = precio en dólares (× TRM × factor de importación) ·
+ * LIST = lista de precios de una fecha anterior (× factor de escalamiento).
+ */
+export const SUPPLY_PRICE_TYPES = ['COP', 'USD', 'LIST'] as const;
+export type SupplyPriceType = (typeof SUPPLY_PRICE_TYPES)[number];
+export const SUPPLY_PRICE_TYPE_LABELS: Record<SupplyPriceType, string> = {
+  COP: 'COP',
+  USD: 'USD',
+  LIST: 'Lista (se escala)',
+};
+
+/** Estado de un precio del subcontratista frente al APU propio (umbrales del Excel de revisión). */
+export const PRICE_REVIEW_STATUSES = ['very_low', 'low', 'ok', 'high', 'very_high'] as const;
+export type PriceReviewStatus = (typeof PRICE_REVIEW_STATUSES)[number];
+export const PRICE_REVIEW_LABELS: Record<PriceReviewStatus, string> = {
+  very_low: 'MUY BAJO',
+  low: 'BAJO',
+  ok: 'OK',
+  high: 'ALTO',
+  very_high: 'MUY ALTO',
 };
 
 export const PAYMENT_MODES = [

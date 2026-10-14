@@ -8,7 +8,9 @@ export function MonthlyChart({ months, measure }: { months: MonthBucket[]; measu
   const values = months.map((m) => m[measure]);
   const max = Math.max(...values, 0);
   const ticks = [1, 0.75, 0.5, 0.25, 0].map((f) => formatCopCompact(max * f));
-  const last = months.length - 1;
+  // Se resalta el último mes con movimiento (no un mes vacío al inicio del mes).
+  const lastWithValue = values.reduce((acc, v, i) => (v > 0 ? i : acc), months.length - 1);
+  const last = lastWithValue;
 
   if (max === 0) {
     return <div className="empty">Aún no hay cotizaciones en los últimos meses.</div>;
@@ -29,7 +31,7 @@ export function MonthlyChart({ months, measure }: { months: MonthBucket[]; measu
         {months.map((m, i) => {
           const v = values[i]!;
           const prev = i > 0 ? values[i - 1]! : 0;
-          const change = prev > 0 ? ((v - prev) / prev) * 100 : null;
+          const change = prev > 0 && v > 0 ? ((v - prev) / prev) * 100 : null;
           const h = Math.max((v / max) * 100, v > 0 ? 6 : 3);
           return (
             <div

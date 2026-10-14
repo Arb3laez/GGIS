@@ -4,6 +4,7 @@ import type { Logger } from '../../lib/logger';
 import type { AttachmentsService } from '../attachments/attachments.service';
 import { isSpreadsheet, sniffDocumentType } from '../attachments/file-type';
 import { AiExtractionError, type AiExtractor } from './ai-extractor';
+import { readBidWorkbook, type BidWorkbookResult } from './bid-workbook';
 import { readPdfText, readSpreadsheet } from './readers';
 
 /**
@@ -22,7 +23,8 @@ export class ImportsService {
   }
 
   fromSpreadsheet(fileName: string, data: Buffer): ImportPreview {
-    if (!isSpreadsheet(data, fileName)) throw badRequest('El archivo no es un Excel (.xlsx, .xls) ni un CSV.');
+    if (!isSpreadsheet(data, fileName))
+      throw badRequest('El archivo no es un Excel (.xlsx, .xls) ni un CSV.');
     let rows;
     try {
       rows = readSpreadsheet(data);
@@ -47,6 +49,18 @@ export class ImportsService {
     };
   }
 
+  /** Libro de análisis de precios (APU) de licitación → datos completos para la cotización. */
+  fromBidWorkbook(fileName: string, data: Buffer): BidWorkbookResult {
+    if (!isSpreadsheet(data, fileName) || /\.csv$/i.test(fileName)) {
+      throw badRequest('El análisis de precios debe ser un Excel (.xlsx o .xls).');
+    }
+    try {
+      return readBidWorkbook(data);
+    } catch (err) {
+      throw badRequest((err as Error).message || 'No se pudo leer el análisis de precios.');
+    }
+  }
+
   fromText(text: string): ImportPreview {
     const rows = parsePastedText(text);
     return { rows, method: 'text', message: `Se detectaron ${rows.length} filas.` };
@@ -64,7 +78,12 @@ export class ImportsService {
       try {
         const rows = await this.ai.extract(data, mime);
         if (rows.length) {
-          return { rows, method: 'ai', message: `Se detectaron ${rows.length} ítems con IA. Revísalos antes de importar.`, ...withAttachment };
+          return {
+            rows,
+            method: 'ai',
+            message: `Se detectaron ${rows.length} ítems con IA. Revísalos antes de importar.`,
+            ...withAttachment,
+          };
         }
         aiFailure = 'La IA no detectó ítems en el documento.';
       } catch (err) {
@@ -93,7 +112,8 @@ export class ImportsService {
     return {
       rows: [],
       method: this.ai.enabled ? 'ai' : 'pdf-text',
-      message: `${attachment ? 'El documento quedó adjunto, pero no' : 'No'} se pudieron detectar ítems automáticamente. ${reason} Agrégalos a mano o con "Pegar filas".`.trim(),
+      message:
+        `${attachment ? 'El documento quedó adjunto, pero no' : 'No'} se pudieron detectar ítems automáticamente. ${reason} Agrégalos a mano o con "Pegar filas".`.trim(),
       ...withAttachment,
     };
   }

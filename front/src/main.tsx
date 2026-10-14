@@ -8,6 +8,7 @@ import { QuoteEditorPage } from './features/editor/QuoteEditorPage';
 import { OfferPage } from './features/offer/OfferPage';
 import { QuotesListPage } from './features/quotes/QuotesListPage';
 import { SettingsPage } from './features/settings/SettingsPage';
+import { ConfirmProvider } from './shared/confirm';
 import { ToastProvider } from './shared/feedback';
 import './styles/global.css';
 
@@ -34,7 +35,9 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <RouterProvider router={router} />
+        <ConfirmProvider>
+          <RouterProvider router={router} />
+        </ConfirmProvider>
       </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,

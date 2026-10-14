@@ -5,7 +5,15 @@ import {
   SOLUTION_TEMPLATES,
   type Solution,
 } from './constants';
-import type { CompanyProfile, CostLine, QuoteDraft, QuoteItem, StaffMember } from './schemas';
+import {
+  apuParamsSchema,
+  bidSchema,
+  type CompanyProfile,
+  type CostLine,
+  type QuoteDraft,
+  type QuoteItem,
+  type StaffMember,
+} from './schemas';
 
 /** Id corto para filas dentro de una cotización (no es un id de base de datos). */
 export function newRowId(): string {
@@ -30,6 +38,8 @@ export function blankItem(description = '', unit = ''): QuoteItem {
     carriesFixedLabor: false,
     complexity: 'medium',
     salePriceOverride: null,
+    apu: null,
+    subcontractorUnitPrice: null,
   };
 }
 
@@ -138,6 +148,9 @@ export function createEmptyDraft(now: Date = new Date()): QuoteDraft {
       notes: '',
       legacyActualCost: null,
     },
+    supplies: [],
+    apuParams: apuParamsSchema.parse({}),
+    bid: bidSchema.parse({}),
   };
 }
 

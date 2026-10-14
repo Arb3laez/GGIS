@@ -8,9 +8,11 @@ import {
 } from '@ggis/domain';
 import { downloadFrom } from '../../api/http';
 import { useQuote } from '../../api/queries';
+import { useConfirm } from '../../shared/confirm';
 import { errorMessage, useToast } from '../../shared/feedback';
 import { STATUS_STYLE } from '../../shared/status';
 import { FilePlus2, FileSpreadsheet, FileText, Save, Truck, Wrench } from 'lucide-react';
+import { BidSection } from './bid/BidSection';
 import { SummaryAside } from './SummaryAside';
 import { useScrollSpy } from './useScrollSpy';
 import { AttachmentsSection } from './sections/AttachmentsSection';
@@ -25,6 +27,17 @@ import { TermsSection } from './sections/TermsSection';
 import { clearLocalDraft, readLocalDraft, saveLocalDraft, useEditor } from './store';
 import { useSaveQuote } from './useSaveQuote';
 
+function draftSummary(client: string, project: string, savedAt: string) {
+  const when = new Date(savedAt).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' });
+  return (
+    <>
+      <div>{client || '(sin cliente)'}</div>
+      {project ? <div className="muted">{project}</div> : null}
+      <div className="muted">Guardado en este navegador: {when}</div>
+    </>
+  );
+}
+
 const SECTIONS = [
   { id: 'solucion', label: 'Solución' },
   { id: 'cliente', label: 'Cliente' },
@@ -33,6 +46,7 @@ const SECTIONS = [
   { id: 'actividades', label: 'M.O. por actividad' },
   { id: 'otros', label: 'Otros costos' },
   { id: 'condiciones', label: 'Condiciones' },
+  { id: 'licitacion', label: 'Licitación / APU' },
   { id: 'precio', label: 'Precio' },
   { id: 'cierre', label: 'Cierre real' },
 ];
@@ -44,6 +58,7 @@ export function QuoteEditorPage() {
   const { data: quote, error, isLoading } = useQuote(id);
   const { quoteId, number, draft, dirty, load, reset, edit } = useEditor();
   const { save, saving } = useSaveQuote();
+  const confirm = useConfirm();
   const navItems = SECTIONS.filter((x) => x.id !== 'cierre' || draft.status === 'won');
   const active = useScrollSpy(navItems.map((x) => x.id));
   const loadedKey = useRef<string | null>(null);
@@ -53,15 +68,20 @@ export function QuoteEditorPage() {
     if (!id) {
       if (loadedKey.current === 'new') return;
       loadedKey.current = 'new';
+      reset();
       const local = readLocalDraft();
-      if (
-        local &&
-        !local.quoteId &&
-        confirm('Hay un borrador sin guardar de una cotización nueva. ¿Quieres recuperarlo?')
-      ) {
-        reset(local.draft);
-      } else {
-        reset();
+      if (local && !local.quoteId) {
+        void confirm({
+          title: '¿Recuperar el borrador?',
+          message: 'Hay una cotización nueva que no se alcanzó a guardar en este navegador.',
+          details: draftSummary(local.draft.client.name, local.draft.client.project, local.savedAt),
+          confirmLabel: 'Recuperar borrador',
+          cancelLabel: 'Empezar en blanco',
+        }).then((ok) => {
+          if (loadedKey.current !== 'new') return;
+          if (ok) reset(local.draft);
+          else clearLocalDraft();
+        });
       }
       return;
     }
@@ -69,14 +89,21 @@ export function QuoteEditorPage() {
       loadedKey.current = quote.id;
       const local = readLocalDraft();
       load(quote);
-      if (
-        local?.quoteId === quote.id &&
-        confirm('Hay cambios sin guardar de esta cotización en este navegador. ¿Recuperarlos?')
-      ) {
-        edit((x) => Object.assign(x, local.draft));
+      if (local?.quoteId === quote.id) {
+        void confirm({
+          title: '¿Recuperar los cambios sin guardar?',
+          message: `Hay cambios de la ${quote.number} que no se alcanzaron a guardar en este navegador.`,
+          details: draftSummary(local.draft.client.name, local.draft.client.project, local.savedAt),
+          confirmLabel: 'Recuperar cambios',
+          cancelLabel: 'Descartarlos',
+        }).then((ok) => {
+          if (loadedKey.current !== quote.id) return;
+          if (ok) edit((x) => Object.assign(x, local.draft));
+          else clearLocalDraft();
+        });
       }
     }
-  }, [id, quote, load, reset, edit]);
+  }, [id, quote, load, reset, edit, confirm]);
 
   // Borrador local de respaldo mientras hay cambios sin guardar.
   useEffect(() => {
@@ -115,8 +142,18 @@ export function QuoteEditorPage() {
     if (savedId) navigate(`/quotes/${savedId}/offer`);
   }
 
-  function startNew() {
-    if (dirty && !confirm('Hay cambios sin guardar. ¿Crear una cotización nueva de todas formas?')) return;
+  async function startNew() {
+    if (
+      dirty &&
+      !(await confirm({
+        title: '¿Descartar los cambios sin guardar?',
+        message: 'Si creas una cotización nueva ahora, se pierden los cambios que no has guardado.',
+        confirmLabel: 'Descartar y crear nueva',
+        cancelLabel: 'Seguir editando',
+        tone: 'danger',
+      }))
+    )
+      return;
     clearLocalDraft();
     loadedKey.current = null;
     navigate('/quotes/new');
@@ -241,6 +278,7 @@ export function QuoteEditorPage() {
             addLabel="+ Agregar costo"
           />
           <TermsSection />
+          <BidSection />
           <PricingSection />
           {draft.status === 'won' ? <ClosureSection /> : null}
         </div>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   blankItem,
   formatCop,
@@ -9,12 +9,13 @@ import {
   type Currency,
   type QuoteItem,
 } from '@ggis/domain';
-import { Package } from 'lucide-react';
+import { Calculator, Package } from 'lucide-react';
 import { exchangeRateApi, useCatalog } from '../../../api/queries';
 import { SectionTitle } from '../../../shared/SectionTitle';
 import { Alerts, errorMessage, useToast } from '../../../shared/feedback';
 import { Checkbox, NumberField, NumberInput } from '../../../shared/inputs';
 import { useBreakdown, useDraft, useEdit } from '../store';
+import { ApuEditor } from '../bid/ApuEditor';
 import { ImportPanel } from './ImportPanel';
 
 const marginColor = (pct: number) => (pct >= 25 ? 'var(--ok)' : pct >= 12 ? 'var(--warn)' : 'var(--danger)');
@@ -27,6 +28,7 @@ export function ItemsSection() {
   const catalog = useCatalog();
   const [filter, setFilter] = useState('');
   const [trmStatus, setTrmStatus] = useState('');
+  const [apuItemId, setApuItemId] = useState<string | null>(null);
 
   const catalogByKey = useMemo(() => {
     const m = new Map<string, CatalogItem>();
@@ -39,9 +41,10 @@ export function ItemsSection() {
     ? d.items.filter((i) => i.description.toLowerCase().includes(filter.toLowerCase()))
     : d.items;
   const warnings = quoteWarnings(d, breakdown).filter(
-    (w) => w.code.startsWith('orphan') || w.code.startsWith('labor'),
+    (w) => w.code.startsWith('orphan') || w.code.startsWith('labor') || w.code === 'no-billable-items',
   );
   const t = breakdown.totals;
+  const closeApu = useCallback(() => setApuItemId(null), []);
 
   const editItem = (id: string, recipe: (i: QuoteItem) => void) =>
     edit((x) => {
@@ -197,11 +200,18 @@ export function ItemsSection() {
                     </select>
                   </td>
                   <td>
-                    <NumberInput
-                      value={it.unitPrice}
-                      ariaLabel="Precio unitario"
-                      onChange={(n) => editItem(it.id, (x) => void (x.unitPrice = n ?? 0))}
-                    />
+                    {b?.apu ? (
+                      <div className="num-out" title="Costo del APU: suministro por unidad">
+                        {formatCop(b.unitSupplyCost)}
+                        <div className="hint">desde APU</div>
+                      </div>
+                    ) : (
+                      <NumberInput
+                        value={it.unitPrice}
+                        ariaLabel="Precio unitario"
+                        onChange={(n) => editItem(it.id, (x) => void (x.unitPrice = n ?? 0))}
+                      />
+                    )}
                   </td>
                   <td className="col-center">
                     <Checkbox
@@ -218,11 +228,15 @@ export function ItemsSection() {
                     />
                   </td>
                   <td>
-                    <NumberInput
-                      value={it.laborPct}
-                      ariaLabel="% mano de obra"
-                      onChange={(n) => editItem(it.id, (x) => void (x.laborPct = n ?? 0))}
-                    />
+                    {b?.apu ? (
+                      <span className="hint">APU</span>
+                    ) : (
+                      <NumberInput
+                        value={it.laborPct}
+                        ariaLabel="% mano de obra"
+                        onChange={(n) => editItem(it.id, (x) => void (x.laborPct = n ?? 0))}
+                      />
+                    )}
                   </td>
                   <td className="col-center">
                     <Checkbox
@@ -275,6 +289,19 @@ export function ItemsSection() {
                   <td className="row-actions">
                     <button
                       type="button"
+                      className={`small${it.apu?.length ? ' apu-on' : ''}`}
+                      title={
+                        it.apu?.length
+                          ? `APU: ${it.apu.length} línea(s)`
+                          : 'Análisis de precio unitario (APU)'
+                      }
+                      aria-label="Abrir APU del ítem"
+                      onClick={() => setApuItemId(it.id)}
+                    >
+                      <Calculator size={13} />
+                    </button>
+                    <button
+                      type="button"
                       className="small"
                       title="Duplicar"
                       aria-label="Duplicar ítem"
@@ -323,6 +350,7 @@ export function ItemsSection() {
         </span>
       </div>
       <Alerts items={warnings} />
+      {apuItemId ? <ApuEditor itemId={apuItemId} onClose={closeApu} /> : null}
     </section>
   );
 }

@@ -40,14 +40,23 @@ export interface AppDeps {
 export function createApp({ config, db, log, fetchFn, aiExtractor }: AppDeps): Express {
   const catalog = new CatalogService(db);
   const quotes = new QuotesService(db, catalog);
+  const refreshed = quotes.refreshSummaries();
+  if (refreshed > 0)
+    log.info({ cotizaciones: refreshed }, 'Totales del listado recalculados con el motor actual');
   const settings = new SettingsService(db);
   const attachments = new AttachmentsService(db, config.attachmentsDir);
   const imports = new ImportsService(aiExtractor ?? createAiExtractor(config.ai, log), attachments, log);
   const exchangeRate = new ExchangeRateService(config.exchangeRateTtlMs, log, fetchFn);
   const backup = new BackupService(quotes, attachments, log);
 
-  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.maxUploadBytes, files: 1 } });
-  const backupUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024, files: 1 } });
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: config.maxUploadBytes, files: 1 },
+  });
+  const backupUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 100 * 1024 * 1024, files: 1 },
+  });
 
   const app = express();
   app.disable('x-powered-by');
@@ -99,7 +108,9 @@ export function createApp({ config, db, log, fetchFn, aiExtractor }: AppDeps): E
   api.use('/backup', backupRouter(backup, backupUpload));
   api.use('/settings', settingsRouter(settings));
   api.use((_req, res) => {
-    res.status(404).json({ error: { code: 'not_found', message: 'Ruta no encontrada.' } } satisfies ApiErrorBody);
+    res
+      .status(404)
+      .json({ error: { code: 'not_found', message: 'Ruta no encontrada.' } } satisfies ApiErrorBody);
   });
   app.use('/api', api);
 
@@ -128,7 +139,10 @@ function errorHandler(log: Logger): ErrorRequestHandler {
       body = {
         error: {
           code: 'upload_error',
-          message: err.code === 'LIMIT_FILE_SIZE' ? 'El archivo es demasiado grande.' : 'No se pudo recibir el archivo.',
+          message:
+            err.code === 'LIMIT_FILE_SIZE'
+              ? 'El archivo es demasiado grande.'
+              : 'No se pudo recibir el archivo.',
         },
       };
     } else if ((err as { type?: string }).type === 'entity.too.large') {

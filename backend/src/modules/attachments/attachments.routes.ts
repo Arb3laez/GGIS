@@ -13,7 +13,11 @@ export function quoteAttachmentsRouter(attachments: AttachmentsService, upload: 
 
   r.post('/', upload.single('file'), (req, res) => {
     if (!req.file) throw badRequest('Falta el archivo (campo "file").');
-    const meta = attachments.add((req.params as { quoteId: string }).quoteId, req.file.originalname, req.file.buffer);
+    const meta = attachments.add(
+      (req.params as { quoteId: string }).quoteId,
+      req.file.originalname,
+      req.file.buffer,
+    );
     res.status(201).json(meta);
   });
 

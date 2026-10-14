@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AttachmentMeta,
   BackupImportResult,
+  BidWorkbookImport,
   BusinessUnit,
   CatalogItem,
   CompanyProfile,
@@ -133,6 +134,7 @@ export const importsApi = {
   document: (file: File, quoteId: string | null) =>
     http.upload<ImportPreview>('/api/imports/document', file, quoteId ? { quoteId } : {}),
   text: (text: string) => http.post<ImportPreview>('/api/imports/text', { text }),
+  bidWorkbook: (file: File) => http.upload<BidWorkbookImport>('/api/imports/bid-workbook', file),
 };
 
 // ---------- TRM ----------

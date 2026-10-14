@@ -17,7 +17,9 @@ let app: ReturnType<typeof createApp>;
 
 const fakeAi: AiExtractor = {
   enabled: true,
-  extract: async () => [{ description: 'Detector de humo', unit: 'UN', quantity: 12, currency: 'COP', unitPrice: 95_000 }],
+  extract: async () => [
+    { description: 'Detector de humo', unit: 'UN', quantity: 12, currency: 'COP', unitPrice: 95_000 },
+  ],
 };
 
 const fakeFetch = (async (url: string | URL | Request) => {
@@ -42,7 +44,13 @@ beforeEach(() => {
   tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ggis-test-'));
   const config = loadConfig({ NODE_ENV: 'test', DATA_DIR: tmp, LOG_LEVEL: 'silent' });
   db = openDatabase(':memory:');
-  app = createApp({ config, db, log: createLogger('silent', false), fetchFn: fakeFetch, aiExtractor: fakeAi });
+  app = createApp({
+    config,
+    db,
+    log: createLogger('silent', false),
+    fetchFn: fakeFetch,
+    aiExtractor: fakeAi,
+  });
 });
 
 afterEach(() => {
@@ -85,7 +93,10 @@ describe('cotizaciones', () => {
 
   it('cambia el estado y limpia el motivo de pérdida si no está perdida', async () => {
     const q = await createQuote();
-    const lost = await request(app).patch(`/api/quotes/${q.id}/status`).send({ status: 'lost', lossReason: 'price' }).expect(200);
+    const lost = await request(app)
+      .patch(`/api/quotes/${q.id}/status`)
+      .send({ status: 'lost', lossReason: 'price' })
+      .expect(200);
     expect(lost.body.lossReason).toBe('price');
     const won = await request(app).patch(`/api/quotes/${q.id}/status`).send({ status: 'won' }).expect(200);
     expect(won.body.lossReason).toBeNull();
@@ -120,7 +131,12 @@ describe('cotizaciones', () => {
       })
       .expect(200);
     const wb = XLSX.read(res.body as Buffer, { type: 'buffer' });
-    expect(wb.SheetNames).toEqual(['Resumen auditoría', 'Materiales y M.O.', 'Personal fijo', 'Otros costos']);
+    expect(wb.SheetNames).toEqual([
+      'Resumen auditoría',
+      'Materiales y M.O.',
+      'Personal fijo',
+      'Otros costos',
+    ]);
   });
 });
 
@@ -136,7 +152,10 @@ describe('importación', () => {
       'Hoja1',
     );
     const file = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
-    const res = await request(app).post('/api/imports/spreadsheet').attach('file', file, 'proveedor.xlsx').expect(200);
+    const res = await request(app)
+      .post('/api/imports/spreadsheet')
+      .attach('file', file, 'proveedor.xlsx')
+      .expect(200);
     expect(res.body.rows).toEqual([
       { description: 'Cámara domo IP', unit: 'UN', quantity: 6, currency: 'COP', unitPrice: 210000 },
     ]);
@@ -153,7 +172,10 @@ describe('importación', () => {
     expect(res.body.rows[0].description).toBe('Detector de humo');
     const list = await request(app).get(`/api/quotes/${q.id}/attachments`).expect(200);
     expect(list.body[0]).toMatchObject({ fileName: 'cotizacion.pdf', mimeType: 'application/pdf' });
-    await request(app).get(`/api/attachments/${list.body[0].id}/file`).expect(200).expect('Content-Type', /pdf/);
+    await request(app)
+      .get(`/api/attachments/${list.body[0].id}/file`)
+      .expect(200)
+      .expect('Content-Type', /pdf/);
   });
 
   it('rechaza archivos que no son PDF ni imagen aunque digan .pdf', async () => {
@@ -178,7 +200,9 @@ describe('respaldo', () => {
           estado: 'Aprobada',
           unidadNegocio: 'Incendios',
           items: [{ id: 'x', desc: 'Detector', qty: 2, price: 100000, currency: 'COP', moPct: 35 }],
-          attachments: [{ name: 'prov.pdf', data: `data:application/pdf;base64,${PDF_BYTES.toString('base64')}` }],
+          attachments: [
+            { name: 'prov.pdf', data: `data:application/pdf;base64,${PDF_BYTES.toString('base64')}` },
+          ],
         },
       },
     };
@@ -192,6 +216,25 @@ describe('respaldo', () => {
     expect(list.body[0]).toMatchObject({ number: 'OT-0007', status: 'won', businessUnit: 'fire' });
     const next = await createQuote();
     expect(next.number).toBe('OT-0008');
+  });
+
+  it('una cotización eliminada libera su número para la importación', async () => {
+    const empty = await createQuote();
+    expect(empty.number).toBe('OT-0001');
+    await request(app).delete(`/api/quotes/${empty.id}`).expect(204);
+    const legacy = {
+      version: 1,
+      fecha: '2026-10-12',
+      index: [{ id: 'OT-0001' }],
+      quotes: { 'OT-0001': { quoteId: 'OT-0001', clientName: 'Cliente legado', items: [] } },
+    };
+    const res = await request(app)
+      .post('/api/backup/import')
+      .attach('file', Buffer.from(JSON.stringify(legacy)), 'respaldo.json')
+      .expect(200);
+    expect(res.body.warnings).toEqual([]);
+    const list = await request(app).get('/api/quotes').expect(200);
+    expect(list.body.map((q: Quote) => q.number)).toEqual(['OT-0001']);
   });
 
   it('exporta y reimporta el formato nuevo', async () => {

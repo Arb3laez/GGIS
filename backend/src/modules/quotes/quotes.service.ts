@@ -66,9 +66,12 @@ export class QuotesService {
     const current = this.repo.findById(id);
     if (!current) throw notFound('La cotización');
     if (current.version !== expectedVersion) {
-      throw conflict('La cotización fue modificada en otra pestaña o por otra persona. Recárgala antes de guardar.', {
-        currentVersion: current.version,
-      });
+      throw conflict(
+        'La cotización fue modificada en otra pestaña o por otra persona. Recárgala antes de guardar.',
+        {
+          currentVersion: current.version,
+        },
+      );
     }
     const record: QuoteRecord = {
       ...current,
@@ -104,6 +107,33 @@ export class QuotesService {
 
   remove(id: string): void {
     if (!this.repo.softDelete(id, this.now().toISOString())) throw notFound('La cotización');
+  }
+
+  /**
+   * Recalcula los totales del listado con el motor actual. Se ejecuta al arrancar, así un cambio en
+   * las fórmulas (p. ej. el redondeo de facturación) se refleja en el listado sin volver a guardar
+   * cada cotización. Devuelve cuántas cambiaron.
+   */
+  refreshSummaries(): number {
+    let changed = 0;
+    transaction(this.db, () => {
+      const current = new Map(this.repo.list().map((s) => [s.id, s]));
+      for (const id of this.repo.listAllIds()) {
+        const r = this.repo.findById(id);
+        if (!r) continue;
+        const next = summarize(r);
+        const prev = current.get(id);
+        if (
+          !prev ||
+          Math.round(prev.total) !== Math.round(next.total) ||
+          Math.round(prev.budgetedCost) !== Math.round(next.budgetedCost)
+        ) {
+          this.repo.updateSummary(id, next);
+          changed++;
+        }
+      }
+    });
+    return changed;
   }
 
   /** Para respaldos: todas las cotizaciones completas. */

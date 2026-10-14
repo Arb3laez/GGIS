@@ -46,12 +46,6 @@ function greeting(): string {
   return h < 12 ? 'Buenos días,' : h < 19 ? 'Buenas tardes,' : 'Buenas noches,';
 }
 
-function pctChange(curr: number, prev: number): string | null {
-  if (prev <= 0) return null;
-  const c = ((curr - prev) / prev) * 100;
-  return `${c >= 0 ? '+' : ''}${c.toFixed(1)}%`;
-}
-
 export function DashboardPage() {
   const { data: all, isLoading } = useQuoteList({});
   const { data: company } = useCompanyProfile();
@@ -67,8 +61,13 @@ export function DashboardPage() {
   const d = useMemo(() => buildDashboard(list, today), [list, today]);
 
   const firstName = company?.signatoryName?.trim().split(/\s+/).slice(0, 2).join(' ');
-  const cur = d.monthly[d.monthly.length - 1];
-  const prev = d.monthly[d.monthly.length - 2];
+  const periodQuoted = d.monthly.reduce((acc, m) => acc + m.quoted, 0);
+  const periodCount = d.monthly.reduce((acc, m) => acc + m.count, 0);
+  const lastIssue = list.reduce<string | null>(
+    (acc, q) => (q.total > 0 && (!acc || q.issueDate > acc) ? q.issueDate : acc),
+    null,
+  );
+  const lastIssueDays = lastIssue ? daysBetween(lastIssue, today) : null;
   const pipeline = d.byStatus.sent.value + d.byStatus.negotiating.value;
   const pipelineCount = d.byStatus.sent.count + d.byStatus.negotiating.count;
 
@@ -83,10 +82,10 @@ export function DashboardPage() {
         <div className="kpi-row">
           <KpiCard
             icon={<ChartColumn size={17} />}
-            label="Cotizado este mes"
-            value={formatCopCompact(cur?.quoted)}
-            delta={pctChange(cur?.quoted ?? 0, prev?.quoted ?? 0)}
-            deltaText="vs. mes anterior"
+            label="Cotizado (6 meses)"
+            value={formatCopCompact(periodQuoted)}
+            delta={String(periodCount)}
+            deltaText={`cotizaciones${lastIssueDays !== null ? ` · la última hace ${lastIssueDays} d` : ''}`}
             to="/quotes"
           />
           <KpiCard
@@ -94,7 +93,7 @@ export function DashboardPage() {
             label="Adjudicado"
             value={formatCopCompact(d.byStatus.won.value)}
             delta={d.closeRatePct === null ? null : formatPct(d.closeRatePct, 0)}
-            deltaText="tasa de cierre"
+            deltaText={d.closeRatePct === null ? 'aún no hay ofertas ganadas o perdidas' : 'tasa de cierre'}
             to="/quotes?status=won"
           />
           <KpiCard

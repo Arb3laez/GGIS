@@ -15,6 +15,7 @@ import {
 } from '@ggis/domain';
 import { downloadFrom } from '../../api/http';
 import { backupApi, useQuoteList, useQuoteMutations } from '../../api/queries';
+import { useConfirm } from '../../shared/confirm';
 import { errorMessage, useToast } from '../../shared/feedback';
 import { STATUS_STYLE } from '../../shared/status';
 
@@ -26,6 +27,7 @@ export function QuotesListPage() {
   const { data: quotes, isLoading, error } = useQuoteList({ status, businessUnit, q: q || undefined });
   const m = useQuoteMutations();
   const notify = useToast();
+  const confirm = useConfirm();
   const navigate = useNavigate();
   const importInput = useRef<HTMLInputElement>(null);
   const today = todayIso();
@@ -169,9 +171,24 @@ export function QuotesListPage() {
                   onError: (e) => notify(errorMessage(e), true),
                 })
               }
-              onDelete={() => {
-                if (!confirm(`¿Eliminar la cotización ${x.number}? Dejará de aparecer en el listado.`))
-                  return;
+              onDelete={async () => {
+                const ok = await confirm({
+                  title: `¿Eliminar la ${x.number}?`,
+                  message:
+                    'Dejará de aparecer en el listado y en los indicadores. Queda guardada para auditoría.',
+                  details: (
+                    <>
+                      <div>{x.clientName || '(sin cliente)'}</div>
+                      {x.projectName ? <div className="muted">{x.projectName}</div> : null}
+                      <div className="muted">
+                        {QUOTE_STATUS_LABELS[x.status]} · {formatCop(x.total)}
+                      </div>
+                    </>
+                  ),
+                  confirmLabel: 'Eliminar cotización',
+                  tone: 'danger',
+                });
+                if (!ok) return;
                 m.remove.mutate(x.id, { onError: (e) => notify(errorMessage(e), true) });
               }}
               onAnalysis={() =>

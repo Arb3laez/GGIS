@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Cctv, FireExtinguisher, Flame, KeyRound, Layers, MapPin, Sparkles, Tag } from 'lucide-react';
 import { itemsFromTemplate, SOLUTION_TEMPLATES, SOLUTIONS, type Solution } from '@ggis/domain';
+import { useConfirm } from '../../../shared/confirm';
 import { SectionTitle } from '../../../shared/SectionTitle';
 
 import { useDraft, useEdit } from '../store';
@@ -18,7 +19,8 @@ const ICONS: Record<Solution, ReactNode> = {
 export function SolutionPicker() {
   const d = useDraft();
   const edit = useEdit();
-  const hasItems = d.items.some((i) => i.description.trim());
+  const confirm = useConfirm();
+  const filled = d.items.filter((i) => i.description.trim()).length;
 
   return (
     <section className="card" id="solucion" aria-labelledby="solution-title">
@@ -35,10 +37,16 @@ export function SolutionPicker() {
             type="button"
             className={`sol-btn${d.solution === key ? ' active' : ''}`}
             aria-pressed={d.solution === key}
-            onClick={() => {
+            onClick={async () => {
               if (
-                hasItems &&
-                !confirm('Esto reemplaza los ítems actuales por los de la plantilla. ¿Continuar?')
+                filled > 0 &&
+                !(await confirm({
+                  title: `¿Cargar la plantilla de ${SOLUTION_TEMPLATES[key].label}?`,
+                  message: `Se reemplazan los ${filled} ítem${filled === 1 ? '' : 's'} actuales por los típicos de esta solución. Los precios que ya pusiste se pierden.`,
+                  confirmLabel: 'Reemplazar ítems',
+                  cancelLabel: 'Conservar mis ítems',
+                  tone: 'danger',
+                }))
               )
                 return;
               edit((x) => {

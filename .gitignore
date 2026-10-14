@@ -18,3 +18,6 @@ backend/data/
 backups/
 legacy/
 cotizaciones-ggis-*.json
+
+# Archivos internos de Claude Code
+.claude/scheduled_tasks.lock

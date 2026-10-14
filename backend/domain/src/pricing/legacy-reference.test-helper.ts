@@ -47,7 +47,8 @@ export function legacyCompute(state: any) {
   const totalMaterial = (row: any) => unitMaterial(row) * (Number(row.qty) || 0);
   const totalMo = (row: any) => unitMo(row) * (Number(row.qty) || 0);
   const laborAsignable = () => staffSubtotal() + moExtraSubtotal();
-  const itemsConMoDirecta = () => state.items.filter((r: any) => r.moDirect && r.desc && (Number(r.qty) || 0) > 0);
+  const itemsConMoDirecta = () =>
+    state.items.filter((r: any) => r.moDirect && r.desc && (Number(r.qty) || 0) > 0);
   const laborAsignadaA = (row: any) => {
     const marcados = itemsConMoDirecta();
     if (marcados.length === 0) return 0;
@@ -95,9 +96,12 @@ export function legacyCompute(state: any) {
   };
 
   const tieneOverride = (row: any) => Number(row.ventaOverride) > 0;
-  const pesoAjustadoItem = (row: any) => totalItem(row) * (FACTOR_COMPLEJIDAD_ITEM[row.complejidadItem || 'media'] || 1);
+  const pesoAjustadoItem = (row: any) =>
+    totalItem(row) * (FACTOR_COMPLEJIDAD_ITEM[row.complejidadItem || 'media'] || 1);
   const costoItemsSinOverrideAjustada = () =>
-    state.items.filter((r: any) => !tieneOverride(r)).reduce((s: number, r: any) => s + pesoAjustadoItem(r), 0);
+    state.items
+      .filter((r: any) => !tieneOverride(r))
+      .reduce((s: number, r: any) => s + pesoAjustadoItem(r), 0);
   const ventaTotalItem = (row: any) => {
     if (tieneOverride(row)) return Number(row.ventaOverride) * (Number(row.qty) || 0);
     const overrideSum = state.items

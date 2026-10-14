@@ -34,7 +34,9 @@ export class AttachmentsService {
 
   list(quoteId: string): AttachmentMeta[] {
     return (
-      this.db.prepare('SELECT * FROM attachments WHERE quote_id = ? ORDER BY created_at').all(quoteId) as Row[]
+      this.db
+        .prepare('SELECT * FROM attachments WHERE quote_id = ? ORDER BY created_at')
+        .all(quoteId) as Row[]
     ).map(toMeta);
   }
 

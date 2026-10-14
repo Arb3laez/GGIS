@@ -136,7 +136,9 @@ export function quoteWarnings(draft: QuoteDraft, breakdown: QuoteBreakdown): Quo
   const out: QuoteWarning[] = [];
   const { totals } = breakdown;
 
-  const orphans = draft.items.filter((i) => !i.description.trim() && i.quantity > 0 && i.unitPrice > 0).length;
+  const orphans = draft.items.filter(
+    (i) => !i.description.trim() && i.quantity > 0 && i.unitPrice > 0,
+  ).length;
   const zeroValue = draft.items.filter(
     (i, idx) => i.description.trim() && i.quantity > 0 && breakdown.items[idx]?.totalCost === 0,
   ).length;
@@ -157,6 +159,15 @@ export function quoteWarnings(draft: QuoteDraft, breakdown: QuoteBreakdown): Quo
       code: 'labor-assigned',
       level: 'ok',
       message: `${formatCop(breakdown.assignableLabor)} de mano de obra cargada a ${breakdown.itemsCarryingLabor} ítem(s) · margen objetivo ${draft.pricing.marginPct}% sobre la venta.`,
+    });
+  }
+
+  const billableCount = breakdown.items.filter((i) => i.isBillable).length;
+  if (billableCount === 0 && totals.directCost > 0) {
+    out.push({
+      code: 'no-billable-items',
+      level: 'danger',
+      message: `Tienes ${formatCop(totals.directCost)} de costo pero ningún ítem con descripción y cantidad: la oferta saldría en $0. Agrega los ítems que vas a cobrar.`,
     });
   }
 
