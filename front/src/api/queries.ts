@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   AttachmentMeta,
   BackupImportResult,
-  BidWorkbookImport,
   BusinessUnit,
   CatalogItem,
   CompanyProfile,
@@ -61,6 +60,7 @@ export const quotesApi = {
     http.put<Quote>(`/api/quotes/${id}`, { version, quote: draft }),
   setStatus: (id: string, change: StatusChange) => http.patch<Quote>(`/api/quotes/${id}/status`, change),
   duplicate: (id: string) => http.post<Quote>(`/api/quotes/${id}/duplicate`),
+  supersede: (id: string) => http.post<Quote>(`/api/quotes/${id}/supersede`),
   remove: (id: string) => http.delete(`/api/quotes/${id}`),
 };
 
@@ -79,6 +79,7 @@ export function useQuoteMutations() {
       },
     }),
     duplicate: useMutation({ mutationFn: quotesApi.duplicate, onSuccess: invalidate }),
+    supersede: useMutation({ mutationFn: quotesApi.supersede, onSuccess: invalidate }),
     remove: useMutation({ mutationFn: quotesApi.remove, onSuccess: invalidate }),
     invalidate,
   };
@@ -134,7 +135,6 @@ export const importsApi = {
   document: (file: File, quoteId: string | null) =>
     http.upload<ImportPreview>('/api/imports/document', file, quoteId ? { quoteId } : {}),
   text: (text: string) => http.post<ImportPreview>('/api/imports/text', { text }),
-  bidWorkbook: (file: File) => http.upload<BidWorkbookImport>('/api/imports/bid-workbook', file),
 };
 
 // ---------- TRM ----------

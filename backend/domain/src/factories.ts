@@ -6,8 +6,6 @@ import {
   type Solution,
 } from './constants';
 import {
-  apuParamsSchema,
-  bidSchema,
   type CompanyProfile,
   type CostLine,
   type QuoteDraft,
@@ -38,8 +36,7 @@ export function blankItem(description = '', unit = ''): QuoteItem {
     carriesFixedLabor: false,
     complexity: 'medium',
     salePriceOverride: null,
-    apu: null,
-    subcontractorUnitPrice: null,
+    pipeLengthM: null,
   };
 }
 
@@ -108,6 +105,7 @@ export function createEmptyDraft(now: Date = new Date()): QuoteDraft {
     nextFollowUp: null,
     client: { name: '', project: '', contact: '', email: '', city: 'Barranquilla' },
     businessUnit: null,
+    serviceType: null,
     complexity: 'medium',
     solution: null,
     issueDate: todayIso(now),
@@ -148,9 +146,8 @@ export function createEmptyDraft(now: Date = new Date()): QuoteDraft {
       notes: '',
       legacyActualCost: null,
     },
-    supplies: [],
-    apuParams: apuParamsSchema.parse({}),
-    bid: bidSchema.parse({}),
+    supersedesNumber: null,
+    supersededByNumber: null,
   };
 }
 
@@ -165,6 +162,9 @@ export function duplicateDraft(source: QuoteDraft, now: Date = new Date()): Quot
     nextFollowUp: null,
     issueDate: todayIso(now),
     closure: empty.closure,
+    // Una copia normal no hereda los vínculos de sustitución; los pone el caso de uso "sustituir".
+    supersedesNumber: null,
+    supersededByNumber: null,
   };
 }
 

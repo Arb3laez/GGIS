@@ -65,6 +65,8 @@ export interface UnitMonthCell {
 }
 
 export interface Dashboard {
+  /** Total de cotizaciones registradas (todas, sin importar el estado). */
+  totalQuotes: number;
   /** Últimos meses (incluido el actual), por fecha de emisión. */
   monthly: MonthBucket[];
   /** Cotizaciones por unidad de negocio y mes (para el mapa de calor). */
@@ -159,6 +161,7 @@ export function buildDashboard(list: QuoteSummary[], todayIso: string): Dashboar
     .sort((a, b) => a.marginTodayPct - b.marginTodayPct);
 
   return {
+    totalQuotes: list.length,
     monthly: monthlyActivity(list, todayIso),
     unitMonth: unitMonthMatrix(list, todayIso),
     byStatus,

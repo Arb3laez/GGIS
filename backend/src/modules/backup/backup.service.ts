@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   fromLegacyBackup,
   isLegacyBackup,
+  normalizeRetiredBidFields,
   quoteDraftSchema,
   type BackupImportResult,
   type Quote,
@@ -53,7 +54,7 @@ export class BackupService {
     }
     if (isLegacyBackup(data)) return this.importLegacy(data);
 
-    const parsed = backupSchema.safeParse(data);
+    const parsed = backupSchema.safeParse(normalizeBackup(data));
     if (!parsed.success) throw badRequest('El archivo no es un respaldo reconocido del cotizador.');
     let imported = 0;
     for (const q of parsed.data.quotes) {
@@ -87,4 +88,12 @@ export class BackupService {
     const skipped = warnings.filter((w) => w.includes('se omitió')).length;
     return { imported: quotes.length, skipped, attachments, warnings };
   }
+}
+
+/** Respaldo nuevo que todavía trae datos de licitación/APU: se normaliza antes de validar. */
+function normalizeBackup(data: unknown): unknown {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+  const backup = data as Record<string, unknown>;
+  if (!Array.isArray(backup.quotes)) return data;
+  return { ...backup, quotes: backup.quotes.map(normalizeRetiredBidFields) };
 }

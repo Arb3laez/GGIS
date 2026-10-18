@@ -1,24 +1,34 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   blankItem,
   formatCop,
   newRowId,
+  PIPE_LENGTHS,
+  pipeLengthLabel,
+  pipePieces,
+  pipePiecesExact,
   quoteWarnings,
   type CatalogItem,
   type Complexity,
   type Currency,
   type QuoteItem,
 } from '@ggis/domain';
-import { Calculator, Package } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { exchangeRateApi, useCatalog } from '../../../api/queries';
 import { SectionTitle } from '../../../shared/SectionTitle';
 import { Alerts, errorMessage, useToast } from '../../../shared/feedback';
 import { Checkbox, NumberField, NumberInput } from '../../../shared/inputs';
 import { useBreakdown, useDraft, useEdit } from '../store';
-import { ApuEditor } from '../bid/ApuEditor';
 import { ImportPanel } from './ImportPanel';
 
 const marginColor = (pct: number) => (pct >= 25 ? 'var(--ok)' : pct >= 12 ? 'var(--warn)' : 'var(--danger)');
+
+/** La longitud comercial solo aplica a tubería que se cotiza por metro lineal. */
+const isPipeItem = (it: QuoteItem) =>
+  it.unit.trim().toUpperCase() === 'ML' && /tuber|tubo|conduit/i.test(it.description);
+
+/** Columnas de sí/no que se pueden aplicar de una vez a todos los ítems visibles. */
+type BulkBoolField = 'applyImportCost' | 'supplierVatIncluded' | 'carriesFixedLabor';
 
 export function ItemsSection() {
   const d = useDraft();
@@ -28,7 +38,7 @@ export function ItemsSection() {
   const catalog = useCatalog();
   const [filter, setFilter] = useState('');
   const [trmStatus, setTrmStatus] = useState('');
-  const [apuItemId, setApuItemId] = useState<string | null>(null);
+  const [bulkLaborPct, setBulkLaborPct] = useState(35);
 
   const catalogByKey = useMemo(() => {
     const m = new Map<string, CatalogItem>();
@@ -40,11 +50,23 @@ export function ItemsSection() {
   const visible = filter
     ? d.items.filter((i) => i.description.toLowerCase().includes(filter.toLowerCase()))
     : d.items;
+  const visibleIds = useMemo(() => new Set(visible.map((i) => i.id)), [visible]);
+  const allOf = (key: BulkBoolField) => visible.length > 0 && visible.every((i) => i[key]);
+  const toggleAll = (key: BulkBoolField) => {
+    const next = !allOf(key);
+    edit((x) => {
+      for (const it of x.items) if (visibleIds.has(it.id)) it[key] = next;
+    });
+  };
+  const applyLaborPct = () => {
+    edit((x) => {
+      for (const it of x.items) if (visibleIds.has(it.id)) it.laborPct = bulkLaborPct;
+    });
+  };
   const warnings = quoteWarnings(d, breakdown).filter(
     (w) => w.code.startsWith('orphan') || w.code.startsWith('labor') || w.code === 'no-billable-items',
   );
   const t = breakdown.totals;
-  const closeApu = useCallback(() => setApuItemId(null), []);
 
   const editItem = (id: string, recipe: (i: QuoteItem) => void) =>
     edit((x) => {
@@ -85,7 +107,8 @@ export function ItemsSection() {
       </SectionTitle>
       <div className="sub">
         Precio en COP o USD (se convierte con la TRM). Cada material con precio se guarda en el catálogo: al
-        escribir su nombre se autocompletan precio, moneda, unidad y % de M.O.
+        escribir su nombre se autocompletan precio, moneda, unidad y % de M.O. En tubería con unidad ML puedes
+        elegir la longitud comercial del tubo (6, 5,8, 3, 2 o 1 m) y verás cuántos tubos necesitas.
       </div>
 
       <ImportPanel />
@@ -121,6 +144,45 @@ export function ItemsSection() {
         <span className="hint">
           {filter ? `${visible.length} de ${d.items.length} ítems` : `${d.items.length} ítems`}
           {catalog.data?.total ? ` · ${catalog.data.total} en catálogo` : ''}
+        </span>
+      </div>
+
+      <div className="bulk-bar" role="group" aria-label="Aplicar a todos los ítems visibles">
+        <span className="hint">Aplicar a los ítems visibles:</span>
+        <BulkToggle
+          label="Nac./transp."
+          all={allOf('applyImportCost')}
+          disabled={visible.length === 0}
+          onClick={() => toggleAll('applyImportCost')}
+        />
+        <BulkToggle
+          label="+IVA 19%"
+          all={allOf('supplierVatIncluded')}
+          disabled={visible.length === 0}
+          onClick={() => toggleAll('supplierVatIncluded')}
+        />
+        <BulkToggle
+          label="Cargar M.O."
+          all={allOf('carriesFixedLabor')}
+          disabled={visible.length === 0}
+          onClick={() => toggleAll('carriesFixedLabor')}
+        />
+        <span className="bulk-field">
+          <span>% M.O.</span>
+          <NumberInput
+            className="cell num"
+            value={bulkLaborPct}
+            ariaLabel="% M.O. para aplicar a todos"
+            onChange={(n) => setBulkLaborPct(n ?? 0)}
+          />
+          <button
+            type="button"
+            className="small"
+            disabled={visible.length === 0}
+            onClick={applyLaborPct}
+          >
+            Aplicar
+          </button>
         </span>
       </div>
 
@@ -180,6 +242,26 @@ export function ItemsSection() {
                       aria-label="Unidad"
                       onChange={(e) => editItem(it.id, (x) => void (x.unit = e.target.value))}
                     />
+                    {isPipeItem(it) ? (
+                      <select
+                        className="cell"
+                        style={{ marginTop: 4, minWidth: 76 }}
+                        aria-label="Longitud comercial del tubo"
+                        value={it.pipeLengthM ?? ''}
+                        onChange={(e) =>
+                          editItem(it.id, (x) => {
+                            x.pipeLengthM = e.target.value ? Number(e.target.value) : null;
+                          })
+                        }
+                      >
+                        <option value="">Tubo: —</option>
+                        {PIPE_LENGTHS.map((l) => (
+                          <option key={l} value={l}>
+                            {pipeLengthLabel(l)}
+                          </option>
+                        ))}
+                      </select>
+                    ) : null}
                   </td>
                   <td>
                     <NumberInput
@@ -187,6 +269,9 @@ export function ItemsSection() {
                       ariaLabel="Cantidad"
                       onChange={(n) => editItem(it.id, (x) => void (x.quantity = n ?? 0))}
                     />
+                    {isPipeItem(it) && it.pipeLengthM && it.quantity > 0 ? (
+                      <PipeHint meters={it.quantity} lengthM={it.pipeLengthM} />
+                    ) : null}
                   </td>
                   <td>
                     <select
@@ -200,18 +285,11 @@ export function ItemsSection() {
                     </select>
                   </td>
                   <td>
-                    {b?.apu ? (
-                      <div className="num-out" title="Costo del APU: suministro por unidad">
-                        {formatCop(b.unitSupplyCost)}
-                        <div className="hint">desde APU</div>
-                      </div>
-                    ) : (
-                      <NumberInput
-                        value={it.unitPrice}
-                        ariaLabel="Precio unitario"
-                        onChange={(n) => editItem(it.id, (x) => void (x.unitPrice = n ?? 0))}
-                      />
-                    )}
+                    <NumberInput
+                      value={it.unitPrice}
+                      ariaLabel="Precio unitario"
+                      onChange={(n) => editItem(it.id, (x) => void (x.unitPrice = n ?? 0))}
+                    />
                   </td>
                   <td className="col-center">
                     <Checkbox
@@ -228,15 +306,11 @@ export function ItemsSection() {
                     />
                   </td>
                   <td>
-                    {b?.apu ? (
-                      <span className="hint">APU</span>
-                    ) : (
-                      <NumberInput
-                        value={it.laborPct}
-                        ariaLabel="% mano de obra"
-                        onChange={(n) => editItem(it.id, (x) => void (x.laborPct = n ?? 0))}
-                      />
-                    )}
+                    <NumberInput
+                      value={it.laborPct}
+                      ariaLabel="% mano de obra"
+                      onChange={(n) => editItem(it.id, (x) => void (x.laborPct = n ?? 0))}
+                    />
                   </td>
                   <td className="col-center">
                     <Checkbox
@@ -289,19 +363,6 @@ export function ItemsSection() {
                   <td className="row-actions">
                     <button
                       type="button"
-                      className={`small${it.apu?.length ? ' apu-on' : ''}`}
-                      title={
-                        it.apu?.length
-                          ? `APU: ${it.apu.length} línea(s)`
-                          : 'Análisis de precio unitario (APU)'
-                      }
-                      aria-label="Abrir APU del ítem"
-                      onClick={() => setApuItemId(it.id)}
-                    >
-                      <Calculator size={13} />
-                    </button>
-                    <button
-                      type="button"
                       className="small"
                       title="Duplicar"
                       aria-label="Duplicar ítem"
@@ -350,7 +411,48 @@ export function ItemsSection() {
         </span>
       </div>
       <Alerts items={warnings} />
-      {apuItemId ? <ApuEditor itemId={apuItemId} onClose={closeApu} /> : null}
     </section>
+  );
+}
+
+/** Equivalente decimal en tubos; el entero para comprar queda en el tooltip. */
+function PipeHint({ meters, lengthM }: { meters: number; lengthM: number }) {
+  const exact = pipePiecesExact(meters, lengthM);
+  const toBuy = pipePieces(meters, lengthM);
+  const fmt = (n: number) => n.toLocaleString('es-CO', { maximumFractionDigits: 2 });
+  return (
+    <div
+      className="hint"
+      title={`${meters} ML ÷ ${pipeLengthLabel(lengthM)} = ${fmt(exact)} tubos (${toBuy} para comprar)`}
+    >
+      {fmt(exact)} tubos
+    </div>
+  );
+}
+
+/** Botón que marca o desmarca una columna de sí/no en todos los ítems visibles. */
+function BulkToggle({
+  label,
+  all,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  all: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`small${all ? ' active' : ''}`}
+      aria-pressed={all}
+      disabled={disabled}
+      title={`${all ? 'Quitar' : 'Marcar'} "${label}" en todos los ítems visibles`}
+      onClick={onClick}
+    >
+      {all ? '✓ ' : ''}
+      {label}
+    </button>
   );
 }

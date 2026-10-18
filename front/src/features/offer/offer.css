@@ -493,13 +493,4 @@
     margin: 12mm;
   }
 }
-.od-aclaraciones {
-  margin: 0;
-  padding-left: 18px;
-}
-.od-aclaraciones li + li {
-  margin-top: 3px;
-}
-.od-aclaraciones .od-impacto {
-  color: #6b6a64;
-}
+

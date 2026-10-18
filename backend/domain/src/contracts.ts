@@ -1,5 +1,5 @@
-import type { BusinessUnit, LossReason, QuoteStatus } from './constants';
-import type { ApuParams, Bid, ClientInfo, ImportedRow, Pricing, QuoteItem, Supply, Terms } from './schemas';
+import type { BusinessUnit, LossReason, QuoteStatus, ServiceType } from './constants';
+import type { ImportedRow } from './schemas';
 
 /**
  * Contratos de la API (lo que viaja entre web y servidor y no es una entidad editable).
@@ -15,6 +15,7 @@ export interface QuoteSummary {
   validDays: number;
   status: QuoteStatus;
   businessUnit: BusinessUnit | null;
+  serviceType: ServiceType | null;
   lossReason: LossReason | null;
   nextFollowUp: string | null;
   /** Total de la oferta (con IVA/AIU). */
@@ -27,6 +28,10 @@ export interface QuoteSummary {
   actualSale: number;
   closedOn: string | null;
   updatedAt: string;
+  /** OT de la cotización que esta sustituye (si es una nueva versión). */
+  supersedesNumber: string | null;
+  /** OT de la cotización que sustituye a esta (si quedó como Sustituida). */
+  supersededByNumber: string | null;
 }
 
 export interface AttachmentMeta {
@@ -63,29 +68,6 @@ export interface ImportPreview {
   /** Mensaje para el usuario (p. ej. cuántas filas vienen sin precio). */
   message: string;
   attachment?: AttachmentMeta;
-}
-
-/** Resultado de importar un libro de análisis de precios (APU) de licitación. */
-export interface BidWorkbookImport {
-  exchangeRate: number | null;
-  /** Encabezado de la hoja RESUMEN (solo los campos que se encontraron). */
-  client: Partial<Pick<ClientInfo, 'name' | 'project' | 'city'>>;
-  apuParams: ApuParams;
-  supplies: Supply[];
-  items: QuoteItem[];
-  aiu: Partial<Pricing['aiu']>;
-  bid: Bid;
-  terms: Partial<Terms>;
-  validDays: number | null;
-  summary: {
-    supplies: number;
-    estimatedSupplies: number;
-    items: number;
-    itemsWithApu: number;
-    itemsWithSubcontractorPrice: number;
-    clarifications: number;
-  };
-  warnings: string[];
 }
 
 export interface BackupImportResult {

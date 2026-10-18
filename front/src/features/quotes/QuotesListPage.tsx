@@ -1,6 +1,16 @@
 import { useRef } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Copy, Download, FileSpreadsheet, FileText, Plus, Search, Trash2, Upload } from 'lucide-react';
+import {
+  ArrowRightLeft,
+  Copy,
+  Download,
+  FileSpreadsheet,
+  FileText,
+  Plus,
+  Search,
+  Trash2,
+  Upload,
+} from 'lucide-react';
 import {
   BUSINESS_UNIT_LABELS,
   BUSINESS_UNITS,
@@ -8,6 +18,7 @@ import {
   formatCop,
   QUOTE_STATUS_LABELS,
   QUOTE_STATUSES,
+  SERVICE_TYPE_LABELS,
   todayIso,
   type BusinessUnit,
   type QuoteStatus,
@@ -171,6 +182,32 @@ export function QuotesListPage() {
                   onError: (e) => notify(errorMessage(e), true),
                 })
               }
+              onSupersede={async () => {
+                const ok = await confirm({
+                  title: `¿Sustituir la ${x.number}?`,
+                  message:
+                    'Se crea una cotización nueva con número propio para el nuevo requerimiento. La actual queda como Sustituida y vinculada a la nueva.',
+                  details: (
+                    <>
+                      <div>{x.clientName || '(sin cliente)'}</div>
+                      {x.projectName ? <div className="muted">{x.projectName}</div> : null}
+                      <div className="muted">
+                        {QUOTE_STATUS_LABELS[x.status]} · {formatCop(x.total)}
+                      </div>
+                    </>
+                  ),
+                  confirmLabel: 'Crear sustitución',
+                  cancelLabel: 'Cancelar',
+                });
+                if (!ok) return;
+                m.supersede.mutate(x.id, {
+                  onSuccess: (dup) => {
+                    notify(`La ${x.number} quedó sustituida por ${dup.number}`);
+                    navigate(`/quotes/${dup.id}`);
+                  },
+                  onError: (e) => notify(errorMessage(e), true),
+                });
+              }}
               onDelete={async () => {
                 const ok = await confirm({
                   title: `¿Eliminar la ${x.number}?`,
@@ -209,6 +246,7 @@ function QuoteRow({
   today,
   onStatus,
   onDuplicate,
+  onSupersede,
   onDelete,
   onAnalysis,
 }: {
@@ -216,12 +254,19 @@ function QuoteRow({
   today: string;
   onStatus: (s: QuoteStatus) => void;
   onDuplicate: () => void;
+  onSupersede: () => void;
   onDelete: () => void;
   onAnalysis: () => void;
 }) {
   const days = daysBetween(q.issueDate, today);
   const s = STATUS_STYLE[q.status];
   const overdue = q.nextFollowUp && q.nextFollowUp <= today;
+  const classification = [
+    q.businessUnit ? BUSINESS_UNIT_LABELS[q.businessUnit] : null,
+    q.serviceType ? SERVICE_TYPE_LABELS[q.serviceType] : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <div className="list-item">
       <div style={{ minWidth: 0, flex: 1 }}>
@@ -251,8 +296,27 @@ function QuoteRow({
         <div style={{ color: 'var(--text-2)', fontSize: 13, margin: '3px 0' }}>{q.projectName || '—'}</div>
         <div className="meta">
           {q.number} · {q.issueDate} (hace {days} d)
-          {q.businessUnit ? ` · ${BUSINESS_UNIT_LABELS[q.businessUnit]}` : ''}
+          {classification ? ` · ${classification}` : ''}
         </div>
+        {q.supersededByNumber || q.supersedesNumber ? (
+          <div className="meta" style={{ marginTop: 2 }}>
+            {q.supersededByNumber ? (
+              <>
+                Sustituida por{' '}
+                <Link to={`/quotes?q=${encodeURIComponent(q.supersededByNumber)}`}>
+                  {q.supersededByNumber}
+                </Link>
+              </>
+            ) : null}
+            {q.supersededByNumber && q.supersedesNumber ? ' · ' : null}
+            {q.supersedesNumber ? (
+              <>
+                Sustituye a{' '}
+                <Link to={`/quotes?q=${encodeURIComponent(q.supersedesNumber)}`}>{q.supersedesNumber}</Link>
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </div>
       <div
         style={{
@@ -277,6 +341,20 @@ function QuoteRow({
           aria-label={`Análisis de costos de ${q.number}`}
         >
           <FileSpreadsheet size={15} />
+        </button>
+        <button
+          type="button"
+          className="icon-btn sm"
+          onClick={onSupersede}
+          disabled={!!q.supersededByNumber}
+          title={
+            q.supersededByNumber
+              ? `Ya fue sustituida por ${q.supersededByNumber}`
+              : 'Sustituir con un nuevo requerimiento'
+          }
+          aria-label={`Sustituir ${q.number}`}
+        >
+          <ArrowRightLeft size={15} />
         </button>
         <button
           type="button"

@@ -113,6 +113,37 @@ describe('cotizaciones', () => {
     expect(third.number).toBe('OT-0003'); // los números no se reutilizan
   });
 
+  it('sustituye: crea una nueva y vincula la anterior', async () => {
+    const original = await createQuote();
+    const res = await request(app).post(`/api/quotes/${original.id}/supersede`).expect(201);
+    expect(res.body.number).toBe('OT-0002');
+    expect(res.body.supersedesNumber).toBe('OT-0001');
+    expect(res.body.supersededByNumber).toBeNull();
+
+    const old = await request(app).get(`/api/quotes/${original.id}`).expect(200);
+    expect(old.body.status).toBe('replaced');
+    expect(old.body.supersededByNumber).toBe('OT-0002');
+
+    const list = await request(app).get('/api/quotes').expect(200);
+    const row = list.body.find((q: Quote) => q.number === 'OT-0001');
+    expect(row).toMatchObject({ status: 'replaced', supersededByNumber: 'OT-0002' });
+
+    // Una copia normal no hereda el vínculo.
+    const dup = await request(app).post(`/api/quotes/${res.body.id}/duplicate`).expect(201);
+    expect(dup.body.supersedesNumber).toBeNull();
+
+    // No se puede sustituir dos veces la misma cotización.
+    await request(app).post(`/api/quotes/${original.id}/supersede`).expect(409);
+  });
+
+  it('guarda el tipo de servicio en el resumen', async () => {
+    const draft = sampleDraft();
+    draft.serviceType = 'preventive';
+    const q = await createQuote(draft);
+    const list = await request(app).get('/api/quotes').expect(200);
+    expect(list.body.find((x: Quote) => x.id === q.id)?.serviceType).toBe('preventive');
+  });
+
   it('aprende el catálogo al guardar', async () => {
     await createQuote();
     const res = await request(app).get('/api/catalog?q=cámara').expect(200);

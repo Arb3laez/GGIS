@@ -38,11 +38,6 @@ export function importsRouter(imports: ImportsService, upload: Multer): Router {
     res.json(await imports.fromDocument(req.file.originalname, req.file.buffer, quoteId));
   });
 
-  r.post('/bid-workbook', upload.single('file'), (req, res) => {
-    if (!req.file) throw badRequest('Falta el archivo (campo "file").');
-    res.json(imports.fromBidWorkbook(req.file.originalname, req.file.buffer));
-  });
-
   r.post('/text', (req, res) => {
     res.json(imports.fromText(validate(textBody, req.body).text));
   });

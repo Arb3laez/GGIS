@@ -5,10 +5,12 @@ import {
   formatPct,
   LOSS_REASON_LABELS,
   QUOTE_STATUS_LABELS,
+  SERVICE_TYPE_LABELS,
   type BusinessUnit,
   type Complexity,
   type LossReason,
   type QuoteStatus,
+  type ServiceType,
 } from '@ggis/domain';
 import { UserRound } from 'lucide-react';
 import { useHistory } from '../../../api/queries';
@@ -58,18 +60,37 @@ export function ClientSection() {
           placeholder="cliente@empresa.com"
           onChange={(v) => edit((x) => void (x.client.email = v.trim()))}
         />
-        <SelectField<BusinessUnit>
-          label="Unidad de negocio"
-          value={d.businessUnit}
-          emptyLabel="— Seleccionar —"
-          options={entries(BUSINESS_UNIT_LABELS)}
-          onChange={(v) =>
-            edit((x) => {
-              x.businessUnit = v;
-              if (v) x.complexity = DEFAULT_COMPLEXITY_BY_UNIT[v];
-            })
-          }
-        />
+        <div>
+          <SelectField<BusinessUnit>
+            label="Unidad de negocio"
+            value={d.businessUnit}
+            emptyLabel="— Seleccionar —"
+            options={entries(BUSINESS_UNIT_LABELS)}
+            onChange={(v) =>
+              edit((x) => {
+                x.businessUnit = v;
+                if (v) x.complexity = DEFAULT_COMPLEXITY_BY_UNIT[v];
+              })
+            }
+          />
+          <SelectField<ServiceType>
+            label="Tipo de servicio"
+            value={d.serviceType}
+            emptyLabel="— Seleccionar —"
+            options={entries(SERVICE_TYPE_LABELS)}
+            onChange={(v) => edit((x) => void (x.serviceType = v))}
+          />
+          {d.businessUnit || d.serviceType ? (
+            <div className="hint">
+              {[
+                d.businessUnit ? BUSINESS_UNIT_LABELS[d.businessUnit] : null,
+                d.serviceType ? SERVICE_TYPE_LABELS[d.serviceType] : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </div>
+          ) : null}
+        </div>
         <div>
           <SelectField<Complexity>
             label="Complejidad del proyecto"

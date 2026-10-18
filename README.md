@@ -55,6 +55,10 @@ npm run legacy:extract-assets -- "C:\ruta\cotizador-ggis-v68.html"
 
 Se conservan los números OT (si están libres), los estados, la bitácora de cierre y los adjuntos. El archivo de respaldo contiene datos de clientes: guárdalo solo en el almacenamiento corporativo aprobado y bórralo de Descargas después de importarlo.
 
+### Cotizaciones con licitación / APU (función retirada)
+
+La tarjeta **Licitación / APU** ya no existe. Las cotizaciones que se guardaron con el método `AIU licitación` (precio unitario = costo directo) se convierten a **AIU** al abrir la base o importar un respaldo, y se descartan los insumos y el APU. El precio de esas cotizaciones se recalcula: revísalo antes de reenviarlas.
+
 ## Producción
 
 ```bash
@@ -87,8 +91,8 @@ npm run typecheck
 npm run lint
 ```
 
-- 222 pruebas del dominio, incluidas 200 de **paridad** contra las fórmulas originales de la v68.
-- 16 pruebas de integración HTTP del backend (SQLite en memoria).
+- 236 pruebas del dominio, incluidas 200 de **paridad** contra las fórmulas originales de la v68.
+- 19 pruebas de integración HTTP del backend (SQLite en memoria).
 
 ## Estructura
 

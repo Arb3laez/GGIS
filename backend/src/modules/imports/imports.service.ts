@@ -4,7 +4,6 @@ import type { Logger } from '../../lib/logger';
 import type { AttachmentsService } from '../attachments/attachments.service';
 import { isSpreadsheet, sniffDocumentType } from '../attachments/file-type';
 import { AiExtractionError, type AiExtractor } from './ai-extractor';
-import { readBidWorkbook, type BidWorkbookResult } from './bid-workbook';
 import { readPdfText, readSpreadsheet } from './readers';
 
 /**
@@ -47,18 +46,6 @@ export class ImportsService {
           ? `Se detectaron ${rows.length} ítems (${withoutPrice} sin precio — parece una lista del cliente). Al elegir cada nombre del catálogo se autocompleta el precio si ya lo habías cotizado.`
           : `Se detectaron ${rows.length} ítems. Revísalos antes de importar.`,
     };
-  }
-
-  /** Libro de análisis de precios (APU) de licitación → datos completos para la cotización. */
-  fromBidWorkbook(fileName: string, data: Buffer): BidWorkbookResult {
-    if (!isSpreadsheet(data, fileName) || /\.csv$/i.test(fileName)) {
-      throw badRequest('El análisis de precios debe ser un Excel (.xlsx o .xls).');
-    }
-    try {
-      return readBidWorkbook(data);
-    } catch (err) {
-      throw badRequest((err as Error).message || 'No se pudo leer el análisis de precios.');
-    }
   }
 
   fromText(text: string): ImportPreview {

@@ -1,10 +1,12 @@
 import {
+  normalizeRetiredBidFields,
   quoteDraftSchema,
   type BusinessUnit,
   type LossReason,
   type QuoteDraft,
   type QuoteStatus,
   type QuoteSummary,
+  type ServiceType,
 } from '@ggis/domain';
 import type { Database } from '../../db/database';
 
@@ -28,12 +30,13 @@ type Row = Record<string, string | number | null>;
 
 /** Completa campos agregados en versiones nuevas; si algo no valida, devuelve lo guardado tal cual. */
 function withDefaults(raw: unknown): QuoteDraft {
-  const parsed = quoteDraftSchema.safeParse(raw);
+  const parsed = quoteDraftSchema.safeParse(normalizeRetiredBidFields(raw));
   return parsed.success ? parsed.data : (raw as QuoteDraft);
 }
 
 const SUMMARY_COLUMNS = `id, number, client_name, project_name, issue_date, valid_days, status, business_unit,
-  loss_reason, next_follow_up, total, budgeted_cost, actual_cost, actual_sale, closed_on, updated_at`;
+  service_type, loss_reason, next_follow_up, total, budgeted_cost, actual_cost, actual_sale, closed_on, updated_at,
+  supersedes_number, superseded_by_number`;
 
 function toSummary(r: Row): QuoteSummary {
   return {
@@ -45,6 +48,7 @@ function toSummary(r: Row): QuoteSummary {
     validDays: Number(r.valid_days),
     status: r.status as QuoteStatus,
     businessUnit: (r.business_unit as BusinessUnit | null) ?? null,
+    serviceType: (r.service_type as ServiceType | null) ?? null,
     lossReason: (r.loss_reason as LossReason | null) ?? null,
     nextFollowUp: (r.next_follow_up as string | null) ?? null,
     total: Number(r.total),
@@ -53,6 +57,8 @@ function toSummary(r: Row): QuoteSummary {
     actualSale: Number(r.actual_sale),
     closedOn: (r.closed_on as string | null) ?? null,
     updatedAt: String(r.updated_at),
+    supersedesNumber: (r.supersedes_number as string | null) ?? null,
+    supersededByNumber: (r.superseded_by_number as string | null) ?? null,
   };
 }
 
@@ -60,6 +66,7 @@ function summaryParams(s: QuoteSummary) {
   return {
     $status: s.status,
     $business_unit: s.businessUnit,
+    $service_type: s.serviceType,
     $client_name: s.clientName,
     $project_name: s.projectName,
     $issue_date: s.issueDate,
@@ -71,6 +78,8 @@ function summaryParams(s: QuoteSummary) {
     $actual_cost: s.actualCost,
     $actual_sale: s.actualSale,
     $closed_on: s.closedOn,
+    $supersedes_number: s.supersedesNumber,
+    $superseded_by_number: s.supersededByNumber,
   };
 }
 
@@ -122,12 +131,12 @@ export class QuotesRepository {
   insert(record: QuoteRecord, summary: QuoteSummary): void {
     this.db
       .prepare(
-        `INSERT INTO quotes (id, number, status, business_unit, client_name, project_name, issue_date, valid_days,
-           loss_reason, next_follow_up, total, budgeted_cost, actual_cost, actual_sale, closed_on, data, version,
-           created_at, updated_at)
-         VALUES ($id, $number, $status, $business_unit, $client_name, $project_name, $issue_date, $valid_days,
-           $loss_reason, $next_follow_up, $total, $budgeted_cost, $actual_cost, $actual_sale, $closed_on, $data, $version,
-           $created_at, $updated_at)`,
+        `INSERT INTO quotes (id, number, status, business_unit, service_type, client_name, project_name, issue_date,
+           valid_days, loss_reason, next_follow_up, total, budgeted_cost, actual_cost, actual_sale, closed_on,
+           supersedes_number, superseded_by_number, data, version, created_at, updated_at)
+         VALUES ($id, $number, $status, $business_unit, $service_type, $client_name, $project_name, $issue_date,
+           $valid_days, $loss_reason, $next_follow_up, $total, $budgeted_cost, $actual_cost, $actual_sale, $closed_on,
+           $supersedes_number, $superseded_by_number, $data, $version, $created_at, $updated_at)`,
       )
       .run({
         $id: record.id,
@@ -144,10 +153,12 @@ export class QuotesRepository {
   update(record: QuoteRecord, summary: QuoteSummary, expectedVersion: number): boolean {
     const result = this.db
       .prepare(
-        `UPDATE quotes SET status = $status, business_unit = $business_unit, client_name = $client_name,
-           project_name = $project_name, issue_date = $issue_date, valid_days = $valid_days, loss_reason = $loss_reason,
-           next_follow_up = $next_follow_up, total = $total, budgeted_cost = $budgeted_cost, actual_cost = $actual_cost,
-           actual_sale = $actual_sale, closed_on = $closed_on, data = $data, version = $version, updated_at = $updated_at
+        `UPDATE quotes SET status = $status, business_unit = $business_unit, service_type = $service_type,
+           client_name = $client_name, project_name = $project_name, issue_date = $issue_date, valid_days = $valid_days,
+           loss_reason = $loss_reason, next_follow_up = $next_follow_up, total = $total, budgeted_cost = $budgeted_cost,
+           actual_cost = $actual_cost, actual_sale = $actual_sale, closed_on = $closed_on,
+           supersedes_number = $supersedes_number, superseded_by_number = $superseded_by_number, data = $data,
+           version = $version, updated_at = $updated_at
          WHERE id = $id AND version = $expected AND deleted_at IS NULL`,
       )
       .run({
@@ -179,10 +190,11 @@ export class QuotesRepository {
   updateSummary(id: string, summary: QuoteSummary): void {
     this.db
       .prepare(
-        `UPDATE quotes SET status = $status, business_unit = $business_unit, client_name = $client_name,
-           project_name = $project_name, issue_date = $issue_date, valid_days = $valid_days, loss_reason = $loss_reason,
-           next_follow_up = $next_follow_up, total = $total, budgeted_cost = $budgeted_cost, actual_cost = $actual_cost,
-           actual_sale = $actual_sale, closed_on = $closed_on
+        `UPDATE quotes SET status = $status, business_unit = $business_unit, service_type = $service_type,
+           client_name = $client_name, project_name = $project_name, issue_date = $issue_date, valid_days = $valid_days,
+           loss_reason = $loss_reason, next_follow_up = $next_follow_up, total = $total, budgeted_cost = $budgeted_cost,
+           actual_cost = $actual_cost, actual_sale = $actual_sale, closed_on = $closed_on,
+           supersedes_number = $supersedes_number, superseded_by_number = $superseded_by_number
          WHERE id = $id`,
       )
       .run({ $id: id, ...summaryParams(summary) });

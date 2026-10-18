@@ -39,7 +39,7 @@ La prueba `backend/domain/src/pricing/engine.test.ts` compara el motor nuevo con
 | Ruta | Módulo | Qué hace |
 |---|---|---|
 | `GET/POST /api/quotes`, `GET/PUT/DELETE /api/quotes/:id` | quotes | CRUD. El número `OT-0001` lo asigna el servidor en una transacción. `PUT` exige `version` (control de concurrencia optimista: 409 si otra persona guardó antes). `DELETE` es borrado lógico. |
-| `PATCH /api/quotes/:id/status`, `POST /api/quotes/:id/duplicate` | quotes | Cambio rápido de estado y duplicado. |
+| `PATCH /api/quotes/:id/status`, `POST /api/quotes/:id/duplicate`, `POST /api/quotes/:id/supersede` | quotes | Cambio rápido de estado, duplicado y sustitución (la anterior queda como Sustituida y vinculada a la nueva). |
 | `GET /api/quotes/:id/cost-analysis.xlsx` | reports | Hoja interna de análisis de costos (4 pestañas). |
 | `GET/POST /api/quotes/:id/attachments`, `GET /api/attachments/:id/file` | attachments | Adjuntos en disco. El tipo real se detecta por los primeros bytes del archivo. |
 | `POST /api/imports/spreadsheet` · `/document` · `/text` | imports | Previsualización de ítems desde Excel/CSV, PDF/imagen (IA en el servidor, o texto del PDF como respaldo) o filas pegadas. |
@@ -56,6 +56,7 @@ Errores: siempre `{"error": {"code", "message", "details?"}}`, con códigos HTTP
 - **SQLite** usando el módulo que trae Node (`node:sqlite`), sin dependencias nativas. Las migraciones están en `backend/src/db/migrations.ts` y se versionan con `PRAGMA user_version`.
 - La tabla `quotes` guarda la cotización completa como JSON (`data`), más columnas de resumen indexadas (estado, unidad, totales) para el listado y los indicadores.
 - Los adjuntos van en `backend/data/attachments/` (en Docker, en el volumen `/data`) (no en la base ni en el navegador).
+- La migración `v3` retiró la función de licitación/APU: las cotizaciones guardadas con el método `aiu_bid` pasan a `aiu` y se descartan los campos `bid`, `supplies` y `apuParams`.
 - **Para varios usuarios en red:** el acceso a datos está aislado en repositorios/servicios. Pasar a PostgreSQL implica cambiar `db/` y los repositorios, sin tocar dominio ni web.
 
 ## Seguridad

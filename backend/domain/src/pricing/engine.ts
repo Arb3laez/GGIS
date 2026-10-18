@@ -1,7 +1,5 @@
 import { ITEM_COMPLEXITY_WEIGHT, SUPPLIER_VAT_RATE } from '../constants';
 import type { Pricing, QuoteDraft, QuoteItem } from '../schemas';
-import { computeAdminBreakdown, type AdminBreakdown } from '../bid/admin';
-import { apuContext, computeApu, hasApu, supplyIndex, type ApuBreakdown } from '../bid/apu';
 import { costLinesSubtotal, staffSubtotal } from './labor';
 
 /**
@@ -27,12 +25,6 @@ export interface ItemBreakdown {
   marginPct: number;
   /** Sale en la oferta al cliente (tiene descripción y cantidad). */
   isBillable: boolean;
-  /** Desglose del APU si el ítem se costea con APU; null = costeo simple. */
-  apu: ApuBreakdown | null;
-  /** Costo unitario de suministro (equipos y materiales) — para separar suministro/instalación. */
-  unitSupplyCost: number;
-  /** Costo unitario de instalación (M.O., herramienta, servicios y M.O. fija repartida). */
-  unitInstallCost: number;
 }
 
 export interface AiuBreakdown {
@@ -72,10 +64,6 @@ export interface QuoteTotals {
 
 export interface QuoteBreakdown {
   totals: QuoteTotals;
-  /** Administración desglosada (solo AIU licitación con administración calculada). */
-  adminBreakdown: AdminBreakdown | null;
-  /** % de administración usado en el AIU (manual o calculado). */
-  aiuAdminPct: number;
   items: ItemBreakdown[];
   /** Personal fijo + M.O. por actividad (lo que se puede cargar a ítems marcados). */
   assignableLabor: number;
@@ -169,36 +157,22 @@ export function computeQuote(draft: QuoteDraft): QuoteBreakdown {
   const carriers = draft.items.filter(carriesLabor);
   const laborPerCarrier = carriers.length > 0 ? assignableLabor / carriers.length : 0;
 
-  // 1) Costos por ítem (APU si lo tiene; si no, precio + % M.O.)
-  const supplies = supplyIndex(draft);
-  const apuCtx = apuContext(draft);
+  // 1) Costos por ítem: precio unitario + % de M.O. (y la M.O. fija repartida si se marcó).
   let materials = 0;
   let itemLabor = 0;
   const partial = draft.items.map((item) => {
-    const apu = hasApu(item) ? computeApu(item.apu!, supplies, apuCtx) : null;
-    const unitMaterialCost = apu ? apu.supply : itemUnitMaterialCost(item, ctx);
-    const unitLaborCost = apu ? apu.labor + apu.tools + apu.services : itemUnitLaborCost(item, ctx);
+    const unitMaterialCost = itemUnitMaterialCost(item, ctx);
+    const unitLaborCost = itemUnitLaborCost(item, ctx);
     const assignedFixedLabor = carriesLabor(item) ? laborPerCarrier : 0;
     const totalCost = (unitMaterialCost + unitLaborCost) * item.quantity + assignedFixedLabor;
     materials += unitMaterialCost * item.quantity;
     itemLabor += unitLaborCost * item.quantity;
-    return { item, apu, unitMaterialCost, unitLaborCost, assignedFixedLabor, totalCost };
+    return { item, unitMaterialCost, unitLaborCost, assignedFixedLabor, totalCost };
   });
-  const bidMode = draft.pricing.method === 'aiu_bid';
 
   // 2) Totales de costo y precio objetivo (exacto, con decimales)
   const directCost = materials + itemLabor + laborActivities + staff + otherCosts;
-  // En AIU licitación los indirectos (pólizas, ICA, GMF, financiación) van dentro de la A.
-  const oh = bidMode
-    ? overheadsOn(directCost, {
-        ...draft.pricing,
-        policiesPct: 0,
-        taxesPct: 0,
-        financingPct: 0,
-        contingencyPct: 0,
-        adminPct: 0,
-      })
-    : overheadsOn(directCost, draft.pricing);
+  const oh = overheadsOn(directCost, draft.pricing);
   const totalCost = oh.total;
   const m = marginFraction(draft.pricing);
   const targetSubtotal = totalCost / (1 - m);
@@ -227,9 +201,6 @@ export function computeQuote(draft: QuoteDraft): QuoteBreakdown {
     let saleUnitPrice = 0;
     if (billed && hasOverride(item)) {
       saleUnitPrice = Math.round(item.salePriceOverride ?? 0);
-    } else if (billed && bidMode) {
-      // Licitación: el precio unitario de la oferta es el costo directo del ítem (APU), redondeado.
-      saleUnitPrice = Math.round(p.totalCost / item.quantity);
     } else if (billed && weightedBase > 0) {
       saleUnitPrice = Math.round((remainder * (weightOf(p) / weightedBase)) / item.quantity);
     }
@@ -248,9 +219,6 @@ export function computeQuote(draft: QuoteDraft): QuoteBreakdown {
       saleTotal,
       marginPct,
       isBillable: billed,
-      apu: p.apu,
-      unitSupplyCost: p.unitMaterialCost,
-      unitInstallCost: unitCost - p.unitMaterialCost,
     };
   });
 
@@ -258,20 +226,11 @@ export function computeQuote(draft: QuoteDraft): QuoteBreakdown {
   // cliente. Sin ítems facturables no hay nada que cobrar (la web muestra un aviso).
   const subtotal = items.reduce((s, i) => s + i.saleTotal, 0);
 
-  // 6) AIU licitación: A (manual o desglosada sobre el costo directo), I y U encima del costo directo.
-  const adminBreakdown =
-    bidMode && draft.bid.adminMode === 'breakdown' ? computeAdminBreakdown(draft.bid, subtotal) : null;
-  const aiuAdminPct = adminBreakdown ? adminBreakdown.pct : draft.pricing.aiu.adminPct;
-  const pricing = bidMode
-    ? { ...draft.pricing, aiu: { ...draft.pricing.aiu, adminPct: aiuAdminPct } }
-    : draft.pricing;
-  const final = finalizeFromSubtotal(subtotal, pricing, true);
-  const costWithAdmin = bidMode ? subtotal + (final.aiu?.admin ?? 0) : totalCost;
-  const profit = bidMode ? (final.aiu?.profit ?? 0) : subtotal - totalCost;
+  // 6) IVA o AIU sobre el subtotal, y utilidad esperada.
+  const final = finalizeFromSubtotal(subtotal, draft.pricing, true);
+  const profit = subtotal - totalCost;
 
   return {
-    adminBreakdown,
-    aiuAdminPct,
     totals: {
       materials,
       itemLabor,
@@ -284,7 +243,7 @@ export function computeQuote(draft: QuoteDraft): QuoteBreakdown {
       financing: oh.financing,
       contingency: oh.contingency,
       adminCost: oh.adminCost,
-      totalCost: costWithAdmin,
+      totalCost,
       profit,
       subtotal,
       ...final,

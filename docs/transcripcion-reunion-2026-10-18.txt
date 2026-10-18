@@ -1,0 +1,346 @@
+[0.6 - 1.6] ¿Ajá?
+[6.7 - 12.7] ¿Ajá?
+[12.7 - 16.2] Sí bien, sí es la pantalla. Sí es la pantalla.
+[16.2 - 17.2] Sí, sí.
+[18.2 - 22.6] Ve el cotizador.
+[23.6 - 24.7] Sí.
+[24.7 - 25.7] Bueno.
+[26.7 - 28.7] Listo, el resumen.
+[28.7 - 31.0] Acá hayamos quedado.
+[31.0 - 35.0] Queremos hacer una clase de...
+[35.0 - 38.1] de dashboard por unidades, por unidades de negocios.
+[38.1 - 40.6] No que sea genérico, ¿cierto?
+[40.6 - 45.2] Es decir, que digamos que aquí muestro un dashboard perfectamente.
+[45.2 - 48.6] ¿Me escuchas?
+[48.6 - 50.6] Sí te escucho, sí te escucho.
+[50.6 - 52.6] Ok, perdón.
+[52.6 - 55.6] Aquí un dashboard por cada...
+[55.6 - 57.6] por cada unidad de negocios.
+[57.6 - 59.6] Eso lo voy a hacer ahora.
+[59.6 - 61.6] Ahora, en cotizaciones...
+[61.6 - 63.7] En cotizaciones...
+[63.7 - 65.7] hayamos quedado que digamos...
+[65.7 - 68.5] en negociosión van a estar estas.
+[68.5 - 70.5] Las que están juntas.
+[70.5 - 73.5] Y las que tienen un nuevo requerimiento van a ser como...
+[73.5 - 75.5] van a ser...
+[75.5 - 79.2] la palabra, si no, es de manera...
+[79.2 - 81.2] era...
+[81.2 - 86.2] reemplazar, no es...
+[86.2 - 87.2] sustituir.
+[87.2 - 88.2] Sustituida.
+[88.2 - 90.2] Aquí iba a estar sustituida.
+[90.2 - 91.2] No reemplazarles.
+[91.2 - 93.2] Esto lo vamos a cambiar, ¿cierto?
+[93.2 - 96.7] Entonces, para...
+[96.7 - 98.7] digamos, que ir más al centro.
+[98.7 - 102.6] Nueva cotización.
+[102.6 - 104.9] Vamos a recuperar el borrador,
+[104.9 - 107.0] la que teníamos acá.
+[107.0 - 109.0] ¿Qué vamos a hacer acá?
+[109.0 - 112.0] Es decir, que ya no está ahí el APU.
+[112.0 - 114.2] Visitación APU, ya no está ahí.
+[114.2 - 116.7] Vale.
+[116.7 - 120.7] Acá digamos que estas son unidades de negocio, ¿cierto?
+[120.7 - 123.4] Uno hunda acá.
+[123.4 - 127.4] Y ya...
+[127.4 - 129.4] ¿Qué quiero yo que usted me indique aquí?
+[129.4 - 133.4] ¿Sigue en la pantalla?
+[133.4 - 134.4] Sí, sí.
+[134.4 - 136.4] Sí, ahí la veo.
+[136.4 - 138.4] Sigue que estoy aquí en unidad de negocio.
+[138.4 - 141.1] ¿Sí?
+[141.1 - 143.1] Lo que quiero es que aquí...
+[143.1 - 145.1] por causa de unidad de negocio,
+[145.1 - 149.3] para que haya suministro, instalación y mantenimiento.
+[149.3 - 151.3] O sea, por causa de unidad de negocio, por ejemplo,
+[151.3 - 155.3] ¿a esta línea tiene suministro, mantenimiento y tal?
+[155.3 - 157.3] Estalación.
+[157.3 - 160.3] O sea, todas tienen suministro.
+[160.3 - 165.2] Suministro, puede ser suministro y instalación.
+[165.2 - 168.4] Suministro.
+[168.4 - 172.4] O sea, cada unidad de negocio puede tener suministro y instalación.
+[172.4 - 174.9] La palabra mantenimiento solo.
+[174.9 - 176.9] Mantenimiento preventivo.
+[176.9 - 179.9] Mantenimiento correctivo.
+[179.9 - 184.0] Aló, ¿me escuchas eso?
+[184.0 - 185.0] Sí, estoy ahí.
+[185.0 - 187.1] Suministro, instalación.
+[187.1 - 189.3] Mantenimiento preventivo.
+[189.3 - 191.3] Mantenimiento correctivo.
+[191.3 - 193.4] Y solamente suministro.
+[193.4 - 195.8] Ok.
+[195.8 - 199.8] O sea, en todas las unidades de negocio,
+[199.8 - 202.8] de acá, cualquiera tiene todo su servicio.
+[202.8 - 206.5] Su servicio.
+[206.5 - 208.5] Ok.
+[208.5 - 210.5] Esto por esta parte.
+[210.5 - 216.8] Ahí hemos quedado que, o sea, podemos poner CTB
+[216.8 - 218.8] y que abajo saldrá como que la unidad de negocio.
+[218.8 - 221.1] O sea, el servicio.
+[221.1 - 222.1] El servicio.
+[222.1 - 226.1] O sea, aquí CTB y al final el servicio.
+[226.1 - 228.1] O sea, el servicio que se basa en el servicio.
+[228.1 - 229.2] Ajá.
+[229.2 - 231.2] Si es suministro, si es mantenimiento preventivo,
+[231.2 - 233.2] si es mantenimiento correctivo,
+[233.2 - 237.3] o si es suministro solo.
+[237.3 - 239.3] Vale.
+[239.3 - 243.8] Acá en el tema de la tubería,
+[243.8 - 245.8] nosotros hemos quedado que,
+[245.8 - 247.8] si éramos una casilla acá,
+[247.8 - 250.8] que eso dividiera, ¿cierto?
+[250.8 - 252.2] Ajá.
+[252.2 - 263.9] Entre 6, 5.8, 3, 6 metros, 5.8, 3 metros.
+[263.9 - 265.6] Señor León,
+[265.6 - 267.6] no hay una posibilidad que usted me pueda escribir
+[267.6 - 270.2] esas características en el chat.
+[270.2 - 271.2] Ya te lo digo.
+[271.2 - 274.3] ¿Y qué está, está en la casa?
+[274.3 - 275.3] Sí.
+[275.3 - 279.9] Espérate ahí.
+[279.9 - 281.9] Ya te la escribí aquí en el chat.
+[281.9 - 282.9] Vale.
+[282.9 - 283.9] De WhatsApp, de WhatsApp.
+[283.9 - 285.2] Ya.
+[285.2 - 287.2] Diego, sería tubería.
+[287.2 - 291.6] Los ML, sería siempre ML.
+[291.6 - 303.9] Entonces, 6 metros, 5.8 metros, 3 metros.
+[303.9 - 304.9] Correcto.
+[304.9 - 308.1] 3 metros.
+[308.1 - 310.5] Ya.
+[310.5 - 311.5] Vale.
+[311.5 - 312.8] 6 metros.
+[312.8 - 316.8] 6 la va a dividir entre esas ML
+[316.8 - 321.5] y pongamos un metro como para que sea.
+[321.5 - 324.6] Vale, vale.
+[324.6 - 326.8] Ya.
+[326.8 - 330.7] Bueno, aquí ya, digamos que aquí,
+[330.7 - 333.6] en el tema de...
+[333.6 - 337.1] Personal, personal.
+[340.3 - 341.3] Ajá.
+[341.3 - 344.3] Es que este, el de la mano de obra,
+[344.3 - 346.3] esto ya tengo un buen,
+[346.3 - 351.1] tenemos que meter la calculadora.
+[351.1 - 354.5] Sí, lo de...
+[354.5 - 355.5] para que...
+[355.5 - 357.5] digamos que cuando...
+[357.5 - 361.0] diga una noturna,
+[361.0 - 362.0] ya me entiendes.
+[362.0 - 369.1] Sí, pero estoy viendo algo aquí.
+[369.1 - 370.2] No, pero que...
+[370.2 - 371.2] ¿Cómo?
+[371.2 - 372.8] Dime.
+[372.8 - 373.8] No, no, te escucho.
+[373.8 - 376.3] No, que he hecho algo que nos va a que...
+[376.3 - 378.6] ¿Qué qué?
+[378.6 - 380.6] No, no, aquí, aquí.
+[380.6 - 385.7] Ajá.
+[385.7 - 386.7] ¿Qué más?
+[386.7 - 387.7] A ver.
+[387.7 - 389.7] La calculadora de las...
+[389.7 - 390.7] de las horas,
+[390.7 - 393.7] eso fue lo que se te olvidó pasarme.
+[393.7 - 399.5] No, te acuerdas que tú le vas a buscar internet.
+[399.5 - 401.5] No, no, no me haces caso que tú me vas a pasar
+[401.5 - 402.5] lo que te sepasó, Claudio,
+[402.5 - 404.5] y yo estudiarlo con pasarlo de Claudio.
+[404.5 - 408.2] Ah, ok.
+[408.2 - 410.2] No, eso fue lo del APU, no fue.
+[410.2 - 414.3] No, lo que yo estoy estudiando es el APU.
+[414.3 - 416.3] Estamos aquí el tema de las horas.
+[416.3 - 419.2] No, pero te acuerdas que estoy aquí.
+[419.2 - 421.2] Yo lo busco y lo meto ahí.
+[421.2 - 422.2] Ah, bueno, listo.
+[422.2 - 423.2] No, todo bien, yo lo busco,
+[423.2 - 424.5] yo lo busco y lo meto.
+[424.5 - 426.5] O sea, todo eso va a estar listo hoy.
+[426.5 - 428.1] Ajá.
+[428.1 - 430.5] Les quedamos el tema de las horas.
+[430.5 - 432.5] O sea, horas extras,
+[432.5 - 434.5] horas recargo...
+[434.5 - 436.5] Recargo y...
+[436.5 - 438.5] Las palabras que están ahí, ¿no?
+[438.5 - 442.0] Sí, sí.
+[442.0 - 444.3] Ahora este...
+[444.3 - 446.3] Con el transporte,
+[446.3 - 448.3] este negocio,
+[448.3 - 449.3] tal, tal, tal,
+[449.3 - 450.3] vamos a volvernos,
+[450.3 - 453.1] y vamos a hacer aquí
+[453.1 - 455.1] una que está en negocio.
+[455.1 - 457.7] O sea, rompió.
+[457.7 - 459.7] Tomó todo.
+[459.7 - 460.7] Ajá.
+[460.7 - 462.7] Sigue, sigue este formato, don León.
+[462.7 - 464.5] Dime.
+[464.5 - 467.8] Sigue la pantalla, mira.
+[467.8 - 468.8] Ya está ahí.
+[468.8 - 470.6] Ajá, sí.
+[470.6 - 472.6] Bueno, yo estoy trabajando en cambiar
+[472.6 - 474.6] esta propuesta de negocio.
+[474.6 - 476.6] Porque hay cambiar esta propuesta de negocio,
+[476.6 - 478.6] porque esto no es comercial.
+[478.6 - 479.6] ¿Qué sentido es esto?
+[479.6 - 480.6] No es comercial.
+[480.6 - 482.6] Esto es simplemente un PDF.
+[482.6 - 484.4] Sí.
+[484.4 - 485.4] O sea, es como con una...
+[485.4 - 486.4] Hey, mira, una factura,
+[486.4 - 487.4] está saliendo en tanto.
+[487.4 - 489.9] ¿Qué es lo que tenemos para nosotros?
+[489.9 - 491.2] Ajá.
+[491.2 - 493.2] Va a ser un nombre de la gente
+[493.2 - 494.2] que estoy creando.
+[494.2 - 495.2] Yo le voy a mostrar la propuesta
+[495.2 - 497.2] de esta que uno hace en la oferta.
+[497.2 - 499.2] Ya, que te mandé esta cuerda.
+[499.2 - 500.2] Sí, sí.
+[500.2 - 502.4] Y lo que vamos a hacer es que...
+[502.4 - 504.4] O sea, digamos que...
+[504.4 - 506.7] La idea es que, por ejemplo...
+[506.7 - 508.7] O sea, vamos a crear el CRM.
+[508.7 - 509.7] Cierto.
+[509.7 - 510.7] Sí.
+[510.7 - 511.7] El CRM,
+[511.7 - 512.7] un poco de palabra,
+[512.7 - 513.7] va a ser la demostración de
+[513.7 - 515.7] cómo va a ser nuestra mercadilla de negocio
+[515.7 - 516.7] y cómo podemos nosotros...
+[516.7 - 518.7] O sea, lo que nosotros podemos ofrecer
+[518.7 - 520.8] que va a ser el plus para ellos.
+[520.8 - 522.8] Es decir,
+[522.8 - 523.8] por qué comprar...
+[523.8 - 524.8] O sea, el CRM,
+[524.8 - 525.8] para qué es?
+[525.8 - 526.8] Para que el CRM
+[526.8 - 528.8] es una información de la gente.
+[528.8 - 529.8] No, sí, por eso.
+[529.8 - 531.8] No, o sea, digamos que...
+[531.8 - 532.8] Está el CRM, ¿cierto?,
+[532.8 - 534.8] donde ellos quieren cotizar.
+[534.8 - 535.8] Cierto.
+[535.8 - 536.8] Ajá.
+[536.8 - 537.8] Ellos cotizan.
+[537.8 - 538.8] Pero, al lado de...
+[538.8 - 539.8] Como en esa barrera,
+[539.8 - 541.8] tengo mañana...
+[541.8 - 543.8] Te mando la propuesta muy bien
+[543.8 - 544.8] de lo que vamos a hacer
+[544.8 - 545.8] con el CRM.
+[545.8 - 546.8] Que es, por ejemplo...
+[546.8 - 549.0] O sea, sí, en la pantalla.
+[549.0 - 550.0] Sí.
+[550.0 - 551.0] Aquí es un cuadrito,
+[551.0 - 553.0] es la persona de todas las personas
+[553.0 - 554.0] y aquí vemos que...
+[554.0 - 556.0] Como que en otro componente
+[556.0 - 557.0] mostrarle todo lo que...
+[557.0 - 558.0] Estuviendo en la oferta,
+[558.0 - 559.0] la oferta como tal.
+[559.0 - 560.0] No, sí.
+[560.0 - 561.0] Además, estuviendo en la oferta.
+[561.0 - 562.0] No, la estoy imaginando.
+[562.0 - 564.0] Es que todavía no la he creado.
+[564.0 - 565.9] Ajá.
+[565.9 - 567.9] Pero eso sería el objetivo,
+[567.9 - 568.9] también, de esta semana,
+[568.9 - 569.9] que viene.
+[569.9 - 572.0] Tiene ya listo el ser...
+[572.0 - 576.3] OK.
+[576.3 - 577.3] Pero creo que estuviste cambiando
+[577.3 - 578.3] esta mañana,
+[578.3 - 580.3] que me dijiste que estabas cambiando.
+[580.3 - 582.3] Era esto, era esto.
+[582.3 - 583.3] Era el APU.
+[583.3 - 585.3] Porque es que cuando fui a cambiarlo,
+[585.3 - 588.8] se había dañado la calculadora.
+[588.8 - 589.8] Ajá.
+[589.8 - 590.8] Y como no tenía idea,
+[590.8 - 593.5] me tocaba hacerlo a mano.
+[593.5 - 594.5] No.
+[594.5 - 595.5] Sí, pero eso fue que me ha dado
+[595.5 - 596.8] mi muñequera.
+[596.8 - 597.8] Porque el...
+[597.8 - 598.8] OK.
+[598.8 - 599.8] El clau que en otros pagan la empresa
+[599.8 - 601.8] está caído.
+[601.8 - 602.8] Está caído.
+[602.8 - 603.8] Imagínate,
+[603.8 - 606.9] todo lo que tuve que revisar.
+[606.9 - 607.9] OK.
+[607.9 - 608.9] Bueno, no.
+[608.9 - 609.9] Entonces,
+[609.9 - 610.9] yo lo que quiero es que, digamos,
+[610.9 - 611.9] si hablamos de...
+[611.9 - 613.9] de extinción de incendio,
+[613.9 - 614.9] digamos que de acuerdo,
+[614.9 - 615.9] mira, se va a hacer,
+[615.9 - 616.9] de acuerdo lo que diga la norma,
+[616.9 - 618.9] tal, le pon una foto,
+[618.9 - 619.9] que uno le puede añadir una foto,
+[619.9 - 620.9] y, o sea,
+[620.9 - 621.9] es como algo explicativo.
+[621.9 - 623.9] Sí, sí, sí, sí, sí.
+[623.9 - 626.2] ¿Entiendes?
+[626.2 - 627.2] O sea,
+[627.2 - 628.2] podemos tener ya ese ejemplo
+[628.2 - 629.2] para mañana.
+[629.2 - 630.2] Sí, pa' eso,
+[630.2 - 631.2] todo va a estar listo para mañana.
+[631.2 - 632.2] Yo, todo y más.
+[632.2 - 633.2] OK.
+[633.2 - 634.2] O sea, yo estoy en esa.
+[634.2 - 635.2] ¿A qué onda?
+[635.2 - 636.3] Yo estoy en esa.
+[636.3 - 637.3] Dale, pues.
+[637.3 - 638.3] Dale, malo.
+[638.3 - 639.3] Pues es que vamos a asimilar...
+[639.3 - 640.3] Era esa duda,
+[640.3 - 641.3] era esa duda porque estaba...
+[641.3 - 642.3] estaba bloqueado aquí en el...
+[642.3 - 643.3] O sea, mira,
+[643.3 - 644.3] que hice el del APU.
+[644.3 - 646.3] ¿Qué es la novia que te llamó?
+[646.3 - 647.4] ¿Cómo?
+[647.4 - 649.9] La novia, la novia te llamó,
+[649.9 - 651.9] es un momento de desconcentrar.
+[651.9 - 652.9] Sí, sí,
+[652.9 - 653.9] y como es que,
+[653.9 - 654.9] y no,
+[654.9 - 655.9] y entonces estaba bloqueado
+[655.9 - 656.9] por el tema de las...
+[656.9 - 657.9] de las buenas que me había dicho,
+[657.9 - 658.9] y yo dije,
+[658.9 - 659.9] bueno, me voy a llamar el video.
+[659.9 - 660.9] ¿A dónde está el video?
+[660.9 - 662.9] ¿Me perdió ese video?
+[662.9 - 663.9] ¿Por qué?
+[663.9 - 664.9] Porque no me sé mucho a nada.
+[664.9 - 665.9] Bueno, avís a ver más tarde
+[665.9 - 666.9] para mandarte una...
+[666.9 - 667.9] una hamburguesa.
+[667.9 - 669.0] Vale, doble,
+[669.0 - 670.0] que todo bien.
+[670.0 - 671.0] Todo bien.
+[671.0 - 672.0] Voy a poner más,
+[672.0 - 673.0] que se llama bien.
+[673.0 - 674.0] Listo.
+[674.0 - 675.0] Vale, pila, pila,
+[675.0 - 676.0] que nos joda.
+[676.0 - 677.0] Mañana, mañana.
+[677.0 - 678.0] Te damos que hoy
+[678.0 - 679.0] quedaba esta vaina.
+[679.0 - 680.0] Listo.
+[680.0 - 681.0] Mañana, mañana está todo listo.
+[681.0 - 682.0] Ya tengo esa duda,
+[682.0 - 683.7] ya resueltas.
+[683.7 - 684.7] Listo, don León,
+[684.7 - 685.7] nos vemos mañana.
+[685.7 - 686.7] A la hora que usted me diga
+[686.7 - 687.7] que estoy presente.
+[687.7 - 688.8] Vale, presente.
+[688.8 - 689.8] Bueno.
+[689.8 - 690.8] Listo, listo.
+[690.8 - 691.8] La tarde.
+[691.8 - 692.8] Bueno, ya.

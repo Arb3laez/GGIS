@@ -8,17 +8,16 @@ import {
   PRICING_METHOD_LABELS,
   QUOTE_STATUS_LABELS,
   BUSINESS_UNIT_LABELS,
+  SERVICE_TYPE_LABELS,
   safeFileName,
   staffMemberCost,
   type CompanyProfile,
   type Quote,
 } from '@ggis/domain';
-import { buildBidSheets, hasBidData } from './bid-sheets';
 
 /**
  * Hoja de análisis de costos (documento INTERNO de auditoría, no se entrega al cliente).
- * Cuatro hojas: resumen, materiales y M.O., personal fijo y otros costos; si la cotización usa el
- * análisis de licitación, además insumos, APU, revisión del subcontratista y AIU / topes.
+ * Cuatro hojas: resumen, materiales y M.O., personal fijo y otros costos.
  */
 export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile) {
   const breakdown = computeQuote(quote);
@@ -42,8 +41,13 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
       'Cotización',
       quote.number,
       '',
-      'Unidad de negocio',
-      quote.businessUnit ? BUSINESS_UNIT_LABELS[quote.businessUnit] : '—',
+      'Unidad / servicio',
+      [
+        quote.businessUnit ? BUSINESS_UNIT_LABELS[quote.businessUnit] : '',
+        quote.serviceType ? SERVICE_TYPE_LABELS[quote.serviceType] : '',
+      ]
+        .filter(Boolean)
+        .join(' · ') || '—',
     ],
     ['Estado', QUOTE_STATUS_LABELS[quote.status], '', 'Modalidad', method],
     ['Cliente', quote.client.name || '—', '', 'Proyecto', quote.client.project || '—'],
@@ -76,7 +80,7 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
   ];
   if (t.aiu) {
     summary.push(
-      [`+ Administración AIU (${breakdown.aiuAdminPct}%)`, '', '', '', r(t.aiu.admin), pct(t.aiu.admin)],
+      [`+ Administración AIU (${p.aiu.adminPct}%)`, '', '', '', r(t.aiu.admin), pct(t.aiu.admin)],
       [
         `+ Imprevisto AIU (${p.aiu.contingencyPct}%)`,
         '',
@@ -234,10 +238,6 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
   );
   addSheet(wb, 'Personal fijo', staff, [50, 14, 16, 14, 12, 14, 14, 16], [1, 4, 6, 7]);
   addSheet(wb, 'Otros costos', others, [16, 44, 12, 16, 16], [3, 4]);
-  if (hasBidData(quote)) {
-    for (const sh of buildBidSheets(quote, breakdown, header))
-      addSheet(wb, sh.name, sh.rows, sh.widths, sh.moneyCols);
-  }
 
   const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
   return { buffer, fileName: `Analisis costos ${quote.number} - ${safeFileName(quote.client.name)}.xlsx` };

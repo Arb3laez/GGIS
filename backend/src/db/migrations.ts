@@ -68,4 +68,21 @@ export const migrations: string[] = [
   UPDATE quotes SET number = number || '~anulada-' || substr(id, 1, 8)
   WHERE deleted_at IS NOT NULL AND number NOT LIKE '%~anulada-%';
   `,
+
+  /* v3 — retirar la función de licitación / APU: las cotizaciones que usaban `aiu_bid` pasan a AIU
+     y se descartan los datos de la licitación (el resto de campos los ignora el esquema al leer). */ `
+  UPDATE quotes
+  SET data = json_remove(json_set(data, '$.pricing.method', 'aiu'), '$.bid', '$.supplies', '$.apuParams')
+  WHERE json_extract(data, '$.pricing.method') = 'aiu_bid';
+  `,
+
+  /* v4 — vínculo de sustitución: la cotización anterior queda como "Sustituida" y apunta a la nueva,
+     y la nueva apunta a la anterior. */ `
+  ALTER TABLE quotes ADD COLUMN supersedes_number TEXT;
+  ALTER TABLE quotes ADD COLUMN superseded_by_number TEXT;
+  `,
+
+  /* v5 — tipo de servicio de la cotización (suministro, mantenimiento, etc.) */ `
+  ALTER TABLE quotes ADD COLUMN service_type TEXT;
+  `,
 ];

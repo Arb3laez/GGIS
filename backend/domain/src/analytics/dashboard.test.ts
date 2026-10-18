@@ -12,6 +12,7 @@ function q(p: Partial<QuoteSummary>): QuoteSummary {
     validDays: 30,
     status: 'sent',
     businessUnit: 'cctv',
+    serviceType: null,
     lossReason: null,
     nextFollowUp: null,
     total: 1_000,
@@ -20,6 +21,8 @@ function q(p: Partial<QuoteSummary>): QuoteSummary {
     actualSale: 0,
     closedOn: null,
     updatedAt: '2026-10-01T00:00:00Z',
+    supersedesNumber: null,
+    supersededByNumber: null,
     ...p,
   };
 }
@@ -68,6 +71,7 @@ describe('indicadores', () => {
       q({ status: 'negotiating', nextFollowUp: '2026-12-01' }),
     ];
     const d = buildDashboard(list, '2026-10-10');
+    expect(d.totalQuotes).toBe(4);
     expect(d.closeRatePct).toBe(50);
     expect(d.lossReasons).toEqual([{ reason: 'price', count: 1 }]);
     expect(pendingFollowUps(list, '2026-10-10')).toHaveLength(1);

@@ -5,6 +5,7 @@ import {
   formatCop,
   formatLongDate,
   PAYMENT_MODE_LABELS,
+  SERVICE_TYPE_LABELS,
   type BusinessUnit,
   type CompanyProfile,
   type Quote,
@@ -91,7 +92,7 @@ function UnitIcon({ unit }: { unit: BusinessUnit | null }) {
 
 /** Oferta comercial para el cliente. No muestra costos internos ni personal: solo precios de venta. */
 export function OfferDocument({ quote: q, company }: { quote: Quote; company: CompanyProfile }) {
-  const { totals: t, items, aiuAdminPct } = computeQuote(q);
+  const { totals: t, items } = computeQuote(q);
   const validUntil = formatLongDate(addDaysIso(q.issueDate, q.validDays));
   const billable = q.items.map((it, i) => ({ it, b: items[i]! })).filter(({ b }) => b.isBillable);
   const payments = [
@@ -168,7 +169,15 @@ export function OfferDocument({ quote: q, company }: { quote: Quote; company: Co
           <Par label="Contacto" value={q.client.contact} />
           <Par label="Correo" value={q.client.email} />
           <Par label="Ciudad del servicio" value={q.client.city} />
-          <Par label="Unidad de negocio" value={q.businessUnit ? BUSINESS_UNIT_LABELS[q.businessUnit] : ''} />
+          <Par
+            label="Unidad de negocio"
+            value={[
+              q.businessUnit ? BUSINESS_UNIT_LABELS[q.businessUnit] : '',
+              q.serviceType ? SERVICE_TYPE_LABELS[q.serviceType] : '',
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          />
         </div>
 
         <div className="od-resumen">
@@ -233,7 +242,7 @@ export function OfferDocument({ quote: q, company }: { quote: Quote; company: Co
                 <TotRow label="Subtotal" value={t.subtotal} />
                 {t.aiu ? (
                   <>
-                    <TotRow label={`Administración (${aiuAdminPct}%)`} value={t.aiu.admin} />
+                    <TotRow label={`Administración (${p.aiu.adminPct}%)`} value={t.aiu.admin} />
                     <TotRow label={`Imprevistos (${p.aiu.contingencyPct}%)`} value={t.aiu.contingency} />
                     <TotRow label={`Utilidad (${p.aiu.profitPct}%)`} value={t.aiu.profit} />
                     <TotRow
@@ -295,20 +304,6 @@ export function OfferDocument({ quote: q, company }: { quote: Quote; company: Co
         <div className="od-legal">
           <Bloque title="Garantía" text={q.terms.warranty} />
           <Bloque title="Exclusiones y comentarios" text={q.terms.exclusions} />
-          {q.bid.clarifications.length ? (
-            <div className="bloque">
-              <div className="bt">Aclaraciones</div>
-              <ol className="bx od-aclaraciones">
-                {q.bid.clarifications.map((c) => (
-                  <li key={c.id}>
-                    <b>{c.topic}</b>
-                    {c.observation ? `: ${c.observation}` : ''}
-                    {c.impact ? <span className="od-impacto"> ({c.impact})</span> : null}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          ) : null}
           <Bloque
             title="Condiciones generales"
             text={`${q.terms.generalConditions} Salvo mención en contrario, la oferta expira automáticamente a los ${q.validDays} días corridos, contados desde la fecha de emisión.`}

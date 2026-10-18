@@ -15,6 +15,7 @@ export function Layout() {
   const [searching, setSearching] = useState(false);
   const [q, setQ] = useState('');
   const pending = dashboard?.followUps.length ?? 0;
+  const totalQuotes = dashboard?.totalQuotes ?? 0;
   const { pathname, hash } = useLocation();
 
   // Enlaces con ancla (#seguimientos, #cierre): desplazarse cuando la sección ya se pintó.
@@ -46,9 +47,9 @@ export function Layout() {
             </NavLink>
             <NavLink to="/quotes" end>
               <FileText size={16} /> <span className="label">Cotizaciones</span>
-              {pending ? (
-                <span className="count" title="Seguimientos pendientes">
-                  {pending}
+              {totalQuotes ? (
+                <span className="count" title="Cotizaciones registradas">
+                  {totalQuotes}
                 </span>
               ) : null}
             </NavLink>

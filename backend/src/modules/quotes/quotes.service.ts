@@ -105,6 +105,43 @@ export class QuotesService {
     return this.create(duplicateDraft(source, this.now()));
   }
 
+  /**
+   * Crea una cotización nueva a partir de la actual y deja la actual como "Sustituida",
+   * vinculando ambas: la vieja apunta a la nueva y la nueva a la vieja.
+   */
+  supersede(id: string): Quote {
+    const source = this.get(id);
+    if (source.supersededByNumber) {
+      throw conflict('Esta cotización ya fue sustituida.', {
+        supersededByNumber: source.supersededByNumber,
+      });
+    }
+
+    const draft = duplicateDraft(source, this.now());
+    draft.supersedesNumber = source.number;
+    draft.supersededByNumber = null;
+    const created = this.create(draft);
+
+    const { id: _id, number: _n, version, createdAt: _c, updatedAt: _u, ...sourceDraft } = source;
+    try {
+      this.update(
+        id,
+        {
+          ...sourceDraft,
+          status: 'replaced',
+          lossReason: null,
+          supersededByNumber: created.number,
+        },
+        version,
+      );
+    } catch (err) {
+      // Si no se pudo marcar la anterior, no se deja una copia suelta.
+      this.remove(created.id);
+      throw err;
+    }
+    return created;
+  }
+
   remove(id: string): void {
     if (!this.repo.softDelete(id, this.now().toISOString())) throw notFound('La cotización');
   }
@@ -161,6 +198,7 @@ function summarize(r: QuoteRecord): QuoteSummary {
     validDays: r.draft.validDays,
     status: r.draft.status,
     businessUnit: r.draft.businessUnit,
+    serviceType: r.draft.serviceType,
     lossReason: r.draft.lossReason,
     nextFollowUp: r.draft.nextFollowUp,
     total: totals.total,
@@ -169,6 +207,8 @@ function summarize(r: QuoteRecord): QuoteSummary {
     actualSale: r.draft.closure.actualSale ?? 0,
     closedOn: r.draft.closure.closedOn,
     updatedAt: r.updatedAt,
+    supersedesNumber: r.draft.supersedesNumber,
+    supersededByNumber: r.draft.supersededByNumber,
   };
 }
 

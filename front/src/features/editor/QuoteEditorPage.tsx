@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   LABOR_ACTIVITY_PRESETS,
   OTHER_COST_PRESETS,
@@ -12,7 +12,6 @@ import { useConfirm } from '../../shared/confirm';
 import { errorMessage, useToast } from '../../shared/feedback';
 import { STATUS_STYLE } from '../../shared/status';
 import { FilePlus2, FileSpreadsheet, FileText, Save, Truck, Wrench } from 'lucide-react';
-import { BidSection } from './bid/BidSection';
 import { SummaryAside } from './SummaryAside';
 import { useScrollSpy } from './useScrollSpy';
 import { AttachmentsSection } from './sections/AttachmentsSection';
@@ -46,7 +45,6 @@ const SECTIONS = [
   { id: 'actividades', label: 'M.O. por actividad' },
   { id: 'otros', label: 'Otros costos' },
   { id: 'condiciones', label: 'Condiciones' },
-  { id: 'licitacion', label: 'Licitación / APU' },
   { id: 'precio', label: 'Precio' },
   { id: 'cierre', label: 'Cierre real' },
 ];
@@ -234,6 +232,23 @@ export function QuoteEditorPage() {
         </div>
       </div>
 
+      {draft.supersededByNumber ? (
+        <div className="alert warning no-print" role="status">
+          Esta cotización fue sustituida por{' '}
+          <Link to={`/quotes?q=${encodeURIComponent(draft.supersededByNumber)}`}>
+            {draft.supersededByNumber}
+          </Link>
+          .
+        </div>
+      ) : null}
+      {draft.supersedesNumber ? (
+        <div className="alert info no-print" role="status">
+          Esta cotización sustituye a{' '}
+          <Link to={`/quotes?q=${encodeURIComponent(draft.supersedesNumber)}`}>{draft.supersedesNumber}</Link>
+          .
+        </div>
+      ) : null}
+
       <nav className="section-nav no-print" aria-label="Secciones de la cotización">
         {navItems.map((x) => (
           <a
@@ -278,7 +293,6 @@ export function QuoteEditorPage() {
             addLabel="+ Agregar costo"
           />
           <TermsSection />
-          <BidSection />
           <PricingSection />
           {draft.status === 'won' ? <ClosureSection /> : null}
         </div>

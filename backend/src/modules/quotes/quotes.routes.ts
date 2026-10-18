@@ -44,6 +44,10 @@ export function quotesRouter(quotes: QuotesService, settings: SettingsService): 
     res.status(201).json(quotes.duplicate(req.params.id));
   });
 
+  r.post('/:id/supersede', (req, res) => {
+    res.status(201).json(quotes.supersede(req.params.id));
+  });
+
   r.delete('/:id', (req, res) => {
     quotes.remove(req.params.id);
     res.status(204).end();

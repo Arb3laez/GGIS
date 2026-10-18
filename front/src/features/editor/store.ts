@@ -2,9 +2,9 @@ import { useMemo } from 'react';
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import {
-  analyzeBid,
   computeQuote,
   createEmptyDraft,
+  normalizeRetiredBidFields,
   quoteDraftSchema,
   type Quote,
   type QuoteDraft,
@@ -81,13 +81,6 @@ export function useBreakdown() {
   return useMemo(() => computeQuote(draft), [draft]);
 }
 
-/** Análisis de licitación en vivo (revisión del subcontratista, topes, Licify). */
-export function useBidAnalysis() {
-  const draft = useDraft();
-  const breakdown = useBreakdown();
-  return useMemo(() => analyzeBid(draft, breakdown), [draft, breakdown]);
-}
-
 // ---------- Borrador local (comodidad por navegador, no es el almacenamiento real) ----------
 const LOCAL_KEY = 'ggis-editor-draft';
 
@@ -113,7 +106,7 @@ export function readLocalDraft(): LocalDraft | null {
     const raw = localStorage.getItem(LOCAL_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as LocalDraft;
-    const draft = quoteDraftSchema.safeParse(parsed.draft);
+    const draft = quoteDraftSchema.safeParse(normalizeRetiredBidFields(parsed.draft));
     return draft.success ? { ...parsed, draft: draft.data } : null;
   } catch {
     return null;
