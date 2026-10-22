@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Propuesta comercial OT-0039 — BUENAVISTA</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 0; }
+  :root{
+    --navy:#08202c;
+    --navy-2:#0d3a52;
+    --blue:#0d94db;
+    --sky:#0eb4fd;
+    --ice:#e2f5fe;
+    --gray:#5b6773;
+    --line:#dfe5ea;
+    --white:#fff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:#e8edf1;
+    font-family:'Manrope',Arial,sans-serif;
+    color:var(--navy);
+    font-size:10pt;
+    line-height:1.45;
+    font-variant-numeric:tabular-nums;
+  }
+  .page{
+    width:210mm;
+    height:297mm;
+    background:#fff;
+    position:relative;
+    overflow:hidden;
+    page-break-after:always;
+    margin:8mm auto;
+    box-shadow:0 10px 35px rgba(8,32,44,.16);
+  }
+  .page:last-child{page-break-after:auto}
+  .pad{padding:18mm 18mm 16mm}
+  .ph{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    font-size:7.2pt;letter-spacing:.16em;text-transform:uppercase;
+    color:#8a97a1;border-bottom:1px solid var(--line);padding-bottom:4mm;
+  }
+  .ph b{color:var(--blue);font-weight:700}
+  .pf{
+    position:absolute;left:18mm;right:18mm;bottom:8mm;
+    border-top:1px solid var(--line);padding-top:2.4mm;
+    display:flex;justify-content:space-between;
+    font-size:6.8pt;color:#94a0a8;letter-spacing:.08em;text-transform:uppercase;
+  }
+  .pf b{color:var(--blue);font-weight:700}
+  .sec-head{display:flex;align-items:flex-start;gap:6mm;margin-top:8mm}
+  .sec-num{font-size:48pt;line-height:.9;font-weight:800;color:var(--sky);letter-spacing:-.04em}
+  h1{font-size:23pt;line-height:1.08;font-weight:800;margin:0;letter-spacing:-.02em}
+  h2{font-size:12.5pt;line-height:1.25;font-weight:800;margin:0 0 2mm}
+  .intro{font-size:10.2pt;line-height:1.65;color:#34434e;max-width:150mm;margin:4mm 0 8mm 18mm}
+  .eyebrow{font-size:7pt;letter-spacing:.16em;text-transform:uppercase;color:var(--blue);font-weight:700}
+  .client-dark{
+    background:var(--navy);color:#fff;padding:7mm 8mm;
+    display:grid;grid-template-columns:1fr 1fr;gap:5mm 12mm;margin-top:2mm;
+  }
+  .client-dark .k{font-size:6.6pt;letter-spacing:.15em;text-transform:uppercase;color:#8dc9e8;margin-bottom:1mm}
+  .client-dark .v{font-size:11.5pt;font-weight:700;line-height:1.25}
+  .opportunity{
+    background:var(--ice);border-left:3.5mm solid var(--sky);
+    padding:5mm 7mm;margin-top:6mm;
+  }
+  .opportunity .k{font-size:7pt;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);font-weight:700;margin-bottom:1.5mm}
+  .opportunity p{margin:0;font-size:9.6pt;line-height:1.5}
+  .photo{position:relative;height:108mm;overflow:hidden;margin-top:7mm;background:#dbe4ea}
+  .photo img{width:100%;height:100%;object-fit:cover;display:block}
+  .photo .ov{
+    position:absolute;left:0;right:0;bottom:0;padding:8mm 8mm 7mm;color:#fff;
+    background:linear-gradient(180deg,rgba(8,32,44,0) 0%,rgba(8,32,44,.82) 65%);
+  }
+  .photo .ov b{display:block;font-size:15pt;line-height:1.15;font-weight:800}
+  .photo .ov span{display:block;font-size:8.2pt;color:#dbe9f1;margin-top:1.5mm}
+  .media-grid{display:grid;grid-template-columns:1.2fr .8fr;gap:4mm;margin-top:6mm}
+  .media{position:relative;height:65mm;overflow:hidden;background:#dbe4ea}
+  .media img{width:100%;height:100%;object-fit:cover;display:block}
+  .media .label{
+    position:absolute;left:5mm;bottom:4.5mm;color:#fff;font-size:8.5pt;font-weight:700;
+    text-shadow:0 1px 8px rgba(0,0,0,.55);
+  }
+  .diagram{background:var(--navy);height:65mm;color:#fff;padding:6mm;display:flex;flex-direction:column;justify-content:space-between}
+  .diagram .dt{font-size:7pt;letter-spacing:.16em;text-transform:uppercase;color:#8dc9e8;font-weight:700}
+  .diagram .flow{display:flex;align-items:center;justify-content:space-between;gap:2mm;margin:4mm 0}
+  .diagram .step{font-size:7.2pt;font-weight:700;line-height:1.2;text-align:center;flex:1}
+  .diagram .step em{display:block;font-style:normal;font-size:14pt;color:var(--sky);margin-bottom:1mm}
+  .diagram .arrow{color:#4c819d;font-size:10pt}
+  .lists{display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-top:4mm}
+  .dark-list{background:var(--navy);color:#fff;padding:6mm}
+  .dark-list h3{font-size:11pt;margin:0 0 4mm;font-weight:800}
+  .dark-list ul,.light-list ul{list-style:none;margin:0;padding:0}
+  .dark-list li{font-size:8.1pt;line-height:1.35;padding:2.6mm 0 2.6mm 5mm;border-bottom:1px solid rgba(255,255,255,.14);position:relative}
+  .dark-list li:last-child{border-bottom:none}
+  .dark-list li:before{content:'+';position:absolute;left:0;top:2.3mm;color:var(--sky);font-weight:800;font-size:11pt}
+  .light-list{background:#f2f9fd;padding:6mm}
+  .light-list h3{font-size:11pt;margin:0 0 4mm;font-weight:800}
+  .light-list .comp{margin-bottom:3.2mm}
+  .light-list .comp b{display:block;font-size:8.4pt}
+  .light-list .comp span{display:block;font-size:7.6pt;color:var(--gray);line-height:1.45}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:3mm;margin-top:6mm}
+  .stats div{background:#f2f9fd;border-left:2mm solid var(--sky);padding:3.5mm 4mm}
+  .stats b{display:block;font-size:18pt;line-height:1;color:var(--blue);font-weight:800}
+  .stats span{display:block;font-size:7.1pt;color:#42515b;line-height:1.35;margin-top:1mm}
+  .visit{display:grid;grid-template-columns:repeat(3,1fr);gap:3mm;margin-top:3mm}
+  .visit div{background:#f2f9fd;border-top:2mm solid var(--sky);padding:3.5mm}
+  .visit b{display:block;font-size:8.2pt}
+  .visit span{display:block;font-size:7.1pt;color:var(--gray);line-height:1.4;margin-top:.8mm}
+  .commitment{background:var(--navy);color:#fff;padding:4.5mm 6mm;margin-top:5mm}
+  .commitment .k{font-size:6.6pt;letter-spacing:.15em;text-transform:uppercase;color:#8dc9e8;font-weight:700;margin-bottom:1mm}
+  .commitment p{margin:0;font-size:9pt;line-height:1.45;color:#e0edf3}
+  .thanks{text-align:center;margin-top:9mm;color:var(--blue);font-size:12pt;font-weight:800;letter-spacing:-.01em}
+  .table{width:100%;border-collapse:collapse;margin-top:4mm}
+  .table thead th{
+    background:var(--navy);color:#fff;font-size:7pt;letter-spacing:.05em;text-transform:uppercase;
+    padding:3.2mm 2.4mm;text-align:left;font-weight:700;
+  }
+  .table thead th.r{text-align:right}
+  .table td{padding:2.8mm 2.4mm;border-bottom:1px solid var(--line);vertical-align:top}
+  .table tr:nth-child(even) td{background:#f6fafc}
+  .table .n{color:var(--blue);font-weight:800;font-size:7.6pt;width:7mm}
+  .table .comp b{display:block;font-size:8.1pt;line-height:1.25}
+  .table .comp span{display:block;font-size:7.2pt;color:var(--gray);line-height:1.35;margin-top:.6mm}
+  .table .cant{text-align:center;font-size:8.1pt;font-weight:700;white-space:nowrap}
+  .table .cant small{display:block;font-size:6.5pt;color:var(--gray);font-weight:600}
+  .table .money{text-align:right;font-size:8.1pt;font-weight:700;white-space:nowrap}
+  .table .money.mut{color:#52616c}
+  .tot-wrap{display:flex;justify-content:flex-end;margin-top:3mm}
+  .tot{width:73mm}
+  .tot table{width:100%;border-collapse:collapse}
+  .tot td{padding:2mm 2.5mm;font-size:8.6pt;border-bottom:1px solid var(--line)}
+  .tot td:last-child{text-align:right;font-weight:700}
+  .tot .total td{background:var(--blue);color:#fff;font-size:11pt;font-weight:800;border:none;padding:3.6mm 2.5mm}
+  .note{font-size:7.2pt;color:var(--gray);line-height:1.5;margin-top:4mm;max-width:150mm}
+  .stages{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;margin-top:5mm}
+  .stage{border:1px solid var(--line);border-top:2.5mm solid var(--sky);padding:5mm;min-height:47mm}
+  .stage .sk{font-size:6.6pt;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);font-weight:700}
+  .stage h3{font-size:10pt;margin:2mm 0 2.5mm;font-weight:800}
+  .stage p{font-size:7.8pt;line-height:1.5;color:#42515b;margin:0}
+  .delivery{background:var(--ice);border-left:3.5mm solid var(--sky);padding:4.5mm 6mm;margin-top:5mm}
+  .delivery .k{font-size:6.8pt;letter-spacing:.15em;text-transform:uppercase;color:var(--blue);font-weight:700;margin-bottom:1.5mm}
+  .delivery p{margin:0;font-size:9.2pt;line-height:1.5}
+  .check-title{font-size:12pt;font-weight:800;margin:7mm 0 3mm}
+  .check{display:grid;grid-template-columns:1fr 1fr;gap:2.5mm 8mm}
+  .check div{font-size:8.2pt;line-height:1.4;padding-left:5mm;position:relative;color:#2f3f4a}
+  .check div:before{content:'+';position:absolute;left:0;top:-.3mm;color:var(--sky);font-weight:800;font-size:11pt}
+  .cards3{display:grid;grid-template-columns:repeat(3,1fr);gap:3.5mm;margin-top:5mm}
+  .card-dark{background:var(--navy);color:#fff;padding:5mm;min-height:33mm}
+  .card-dark .k{font-size:6.6pt;letter-spacing:.15em;text-transform:uppercase;color:#8dc9e8;font-weight:700}
+  .card-dark .v{font-size:17pt;font-weight:800;margin:1.5mm 0}
+  .card-dark .s{font-size:7.3pt;color:#c4d8e3;line-height:1.4}
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:10mm;margin-top:7mm}
+  .two-col h3{font-size:12pt;font-weight:800;margin:0 0 3mm}
+  .two-col ul{list-style:none;margin:0;padding:0}
+  .two-col li{font-size:8.4pt;line-height:1.4;padding:2.2mm 0 2.2mm 5mm;position:relative;color:#2f3f4a;border-bottom:1px solid var(--line)}
+  .two-col li:before{content:'+';position:absolute;left:0;top:1.8mm;color:var(--sky);font-weight:800;font-size:11pt}
+  .approval{border:1.2mm solid var(--navy);padding:6mm;margin-top:8mm}
+  .approval .logo{height:18mm;width:auto;background:#fff;padding:2mm 3mm;border:1px solid var(--line);display:inline-block}
+  .approval h3{font-size:14pt;font-weight:800;margin:4mm 0 2mm}
+  .approval p{font-size:8.2pt;line-height:1.55;color:#3e4d57;margin:0 0 7mm;max-width:160mm}
+  .signs{display:grid;grid-template-columns:1fr 1fr;gap:14mm}
+  .sign{border-top:1px solid var(--navy);padding-top:3mm}
+  .sign b{display:block;font-size:9pt}
+  .sign span{display:block;font-size:7.4pt;color:var(--gray);margin-top:.8mm}
+  /* Portada */
+  .cover{background:var(--navy);color:#fff;padding:0}
+  .cover-img{position:absolute;right:0;top:0;width:47%;height:100%;object-fit:cover;filter:brightness(.72) saturate(.9)}
+  .cover:after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,var(--navy) 0%,var(--navy) 49%,rgba(8,32,44,.28) 70%,rgba(8,32,44,.12) 100%);z-index:1}
+  .cover-line{position:absolute;left:8mm;top:0;bottom:0;width:1.2mm;background:var(--sky);z-index:3}
+  .cover-left{position:absolute;left:0;top:0;width:60%;height:100%;padding:18mm 10mm 16mm 18mm;z-index:3;display:flex;flex-direction:column}
+  .cover-logo{background:#fff;padding:4mm 5mm;display:inline-flex;align-self:flex-start}
+  .cover-logo img{height:19mm;width:auto;display:block}
+  .cover-kicker{font-size:8pt;letter-spacing:.22em;color:var(--sky);font-weight:700;margin-top:12mm;text-transform:uppercase}
+  .cover-rule{width:18mm;height:1.1mm;background:var(--sky);margin:4mm 0 7mm}
+  .cover-title{font-size:38pt;line-height:1.02;font-weight:800;letter-spacing:-.035em;margin:0}
+  .cover-client{margin-top:auto;padding-top:12mm;border-top:1px solid rgba(255,255,255,.25);max-width:78mm}
+  .cover-client .nm{font-size:10.5pt;font-weight:800;line-height:1.25}
+  .cover-client .pr{font-size:8pt;color:#c3d5df;line-height:1.45;margin-top:2mm}
+  .cover-client .by{font-size:7.3pt;color:#9fb4c0;margin-top:4mm;line-height:1.4}
+  .cover-offer{position:absolute;right:13mm;bottom:17mm;z-index:3;border:1px solid rgba(255,255,255,.55);padding:4mm 5mm;min-width:46mm}
+  .cover-offer .k{font-size:7.3pt;color:#dce8ee}
+  .cover-offer .n{font-size:17pt;color:var(--sky);font-weight:800;line-height:1.1}
+  .cover-offer .s{font-size:6.8pt;color:#dce8ee;line-height:1.35}
+  .cover-vertical{position:absolute;right:5mm;top:18mm;z-index:3;writing-mode:vertical-rl;font-size:6.4pt;letter-spacing:.24em;text-transform:uppercase;color:#b9ccd6}
+  @media print{
+    body{background:#fff}
+    .page{margin:0;box-shadow:none}
+  }
+</style>
+</head>
+<body>
+
+<!-- 01 · PORTADA -->
+<section class="page cover">
+  <img class="cover-img" src="assets/cover-clean2.jpg" alt="Bodega industrial al atardecer">
+  <div class="cover-line"></div>
+  <div class="cover-vertical">Seguridad que responde</div>
+  <div class="cover-left">
+    <div class="cover-logo"><img src="assets/gyg.png" alt="G&amp;G Innova Solutions"></div>
+    <div class="cover-kicker">Propuesta comercial</div>
+    <div class="cover-rule"></div>
+    <h1 class="cover-title">Detectar<br>a tiempo.<br>Proteger<br>siempre.</h1>
+    <div class="cover-client">
+      <div class="nm">BUENAVISTA</div>
+      <div class="pr">Mantenimiento preventivo<br>Barranquilla, Colombia</div>
+      <div class="by">Una propuesta de G&amp;G Innova Solutions<br>Detección de incendios</div>
+    </div>
+  </div>
+  <div class="cover-offer">
+    <div class="k">Oferta</div>
+    <div class="n">OT-0039</div>
+    <div class="s">8 ítems · Detección de incendios</div>
+  </div>
+</section>
+
+<!-- 02 · NECESIDAD -->
+<section class="page">
+  <div class="pad">
+    <div class="ph"><span>G&amp;G Innova Solutions</span><span><b>01 / La necesidad</b></span></div>
+    <div class="sec-head">
+      <div class="sec-num">01</div>
+      <h1>Un sistema de detección<br>listo para responder</h1>
+    </div>
+    <p class="intro">Un sistema de detección de incendios solo protege si está disponible. Esta propuesta mantiene, prueba y ajusta la instalación para que detecte a tiempo, notifique con claridad y deje evidencia de su estado.</p>
+
+    <div class="client-dark">
+      <div><div class="k">Cliente</div><div class="v">BUENAVISTA</div></div>
+      <div><div class="k">Proyecto</div><div class="v">Mantenimiento preventivo</div></div>
+      <div><div class="k">Ciudad</div><div class="v">Barranquilla, Colombia</div></div>
+      <div><div class="k">Unidad</div><div class="v">Detección de incendios</div></div>
+    </div>
+
+    <div class="opportunity">
+      <div class="k">La oportunidad</div>
+      <p>Realizar el mantenimiento preventivo del sistema, verificar cada dispositivo y entregar un informe con hallazgos y recomendaciones para mantener la operación protegida.</p>
+    </div>
+
+    <div class="photo">
+      <img src="assets/warehouse.jpg" alt="Bodega y operación logística">
+      <div class="ov">
+        <b>Un sistema probado y listo para responder.</b>
+        <span>Mantenimiento preventivo con trazabilidad, no una visita de emergencia.</span>
+      </div>
+    </div>
+    <div class="pf"><span>G&amp;G Innova Solutions · La respuesta a tu necesidad</span><span><b>OT-0039</b> · 2 / 6</span></div>
+  </div>
+</section>
+
+<!-- 03 · ARQUITECTURA -->
+<section class="page">
+  <div class="pad">
+    <div class="ph"><span>La solución</span><span><b>02 / Arquitectura</b></span></div>
+    <div class="sec-head">
+      <div class="sec-num">02</div>
+      <h1>Una detección confiable,<br>de la central al último detector</h1>
+    </div>
+    <p class="intro">El sistema combina una central de control, dispositivos de detección, señalización y la infraestructura de canalización y cableado que los conecta. El mantenimiento cubre cada eslabón de esa cadena.</p>
+
+    <div class="media-grid">
+      <div class="media">
+        <img src="assets/cover-clean2.jpg" alt="Bodega industrial">
+        <div class="label">Cobertura en la operación</div>
+      </div>
+      <div class="diagram">
+        <div class="dt">Cadena de respuesta</div>
+        <div class="flow">
+          <div class="step"><em>01</em>Detección</div>
+          <div class="arrow">→</div>
+          <div class="step"><em>02</em>Notificación</div>
+          <div class="arrow">→</div>
+          <div class="step"><em>03</em>Respuesta</div>
+        </div>
+        <div style="font-size:7.2pt;color:#c4d8e3;line-height:1.5">Central, detectores, estaciones manuales y sirenas integrados para avisar a tiempo.</div>
+      </div>
+    </div>
+
+    <div class="lists">
+      <div class="dark-list">
+        <h3>Lo que integra G&amp;G</h3>
+        <ul>
+          <li>Diagnóstico y revisión del sistema.</li>
+          <li>Mantenimiento de central y dispositivos.</li>
+          <li>Pruebas de detección y notificación.</li>
+          <li>Ajustes y reposición de consumibles.</li>
+          <li>Informe técnico y recomendaciones.</li>
+          <li>Acompañamiento y garantía.</li>
+        </ul>
+      </div>
+      <div class="light-list">
+        <h3>Componentes clave</h3>
+        <div class="comp"><b>Panel de detección (FACP)</b><span>Central de control y supervisión del sistema.</span></div>
+        <div class="comp"><b>Detector de humo</b><span>Detección temprana en las áreas protegidas.</span></div>
+        <div class="comp"><b>Estación manual y sirena</b><span>Activación y notificación audible y visual.</span></div>
+        <div class="comp"><b>Tubería EMT y cable FPLR</b><span>Canalización y cableado resistente al fuego.</span></div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div><b>1</b><span>Central de detección</span></div>
+      <div><b>10</b><span>Detectores de humo</span></div>
+      <div><b>20</b><span>Estaciones manuales</span></div>
+      <div><b>15</b><span>Sirenas y estrobos</span></div>
+    </div>
+    <div class="pf"><span>G&amp;G Innova Solutions · La respuesta a tu necesidad</span><span><b>OT-0039</b> · 3 / 6</span></div>
+  </div>
+</section>
+
+<!-- 04 · INVERSIÓN -->
+<section class="page">
+  <div class="pad">
+    <div class="ph"><span>Inversión</span><span><b>03 / Detalle económico</b></span></div>
+    <div class="sec-head">
+      <div class="sec-num">03</div>
+      <h1>Una inversión clara,<br>línea por línea</h1>
+    </div>
+    <p class="intro">La propuesta separa equipos, infraestructura y mantenimiento para que el alcance se pueda revisar con transparencia.</p>
+
+    <table class="table">
+      <thead><tr><th></th><th>Componente</th><th style="text-align:center">Cant.</th><th style="text-align:right">Unitario</th><th style="text-align:right">Total</th></tr></thead>
+      <tbody>
+        <tr><td class="n">01</td><td class="comp"><b>Panel de detección (FACP)</b><span>Central de control y supervisión</span></td><td class="cant">1<small>UN</small></td><td class="money mut">$20.534.599</td><td class="money">$20.534.599</td></tr>
+        <tr><td class="n">02</td><td class="comp"><b>Detector de humo</b><span>Detección temprana en áreas protegidas</span></td><td class="cant">10<small>UN</small></td><td class="money mut">$1.856.227</td><td class="money">$18.562.270</td></tr>
+        <tr><td class="n">03</td><td class="comp"><b>Estación manual de alarma</b><span>Activación manual y aviso</span></td><td class="cant">20<small>UN</small></td><td class="money mut">$1.039.057</td><td class="money">$20.781.140</td></tr>
+        <tr><td class="n">04</td><td class="comp"><b>Sirena / estrobo</b><span>Notificación audible y visual</span></td><td class="cant">15<small>UN</small></td><td class="money mut">$1.377.191</td><td class="money">$20.657.865</td></tr>
+        <tr><td class="n">05</td><td class="comp"><b>Módulo de control</b><span>Supervisión de dispositivos</span></td><td class="cant">5<small>UN</small></td><td class="money mut">$3.712.454</td><td class="money">$18.562.270</td></tr>
+        <tr><td class="n">06</td><td class="comp"><b>Baterías 12V</b><span>Respaldo de energía</span></td><td class="cant">2<small>UN</small></td><td class="money mut">$8.664.802</td><td class="money">$17.329.604</td></tr>
+        <tr><td class="n">07</td><td class="comp"><b>Tubería EMT 3/4</b><span>Canalización y protección del cableado</span></td><td class="cant">1.000<small>ML</small></td><td class="money mut">$38.942</td><td class="money">$38.942.000</td></tr>
+        <tr><td class="n">08</td><td class="comp"><b>Cable FPLR calibre 18</b><span>Cable resistente al fuego</span></td><td class="cant">1.000<small>ML</small></td><td class="money mut">$19.631</td><td class="money">$19.631.000</td></tr>
+      </tbody>
+    </table>
+
+    <div class="tot-wrap">
+      <div class="tot">
+        <table>
+          <tr><td>Subtotal</td><td>$175.000.748</td></tr>
+          <tr><td>Administración (8%)</td><td>$14.000.060</td></tr>
+          <tr><td>Imprevistos (4%)</td><td>$7.000.030</td></tr>
+          <tr><td>Utilidad (4%)</td><td>$7.000.030</td></tr>
+          <tr><td>IVA sobre utilidad (19%)</td><td>$1.330.006</td></tr>
+          <tr class="total"><td>Total oferta</td><td>$204.330.874</td></tr>
+        </table>
+      </div>
+    </div>
+    <p class="note">Valores en pesos colombianos. Oferta válida hasta el 24 de octubre de 2026, contados desde la fecha de emisión. Los precios están sujetos a cambios si cambian las especificaciones o el alcance.</p>
+    <div class="pf"><span>G&amp;G Innova Solutions · La respuesta a tu necesidad</span><span><b>OT-0039</b> · 4 / 6</span></div>
+  </div>
+</section>
+
+<!-- 05 · IMPLEMENTACIÓN -->
+<section class="page">
+  <div class="pad">
+    <div class="ph"><span>Implementación</span><span><b>04 / Cómo avanzamos</b></span></div>
+    <div class="sec-head">
+      <div class="sec-num">04</div>
+      <h1>De la visita<br>a la confianza</h1>
+    </div>
+    <p class="intro">El valor del mantenimiento no termina cuando se revisa el último dispositivo. Incluye pruebas, registro y una entrega que permita operar con claridad.</p>
+
+    <div class="stages">
+      <div class="stage"><div class="sk">Etapa 01</div><h3>Programación</h3><p>Coordinación de acceso, alcance y fecha. Equipos nacionales: 30 días hábiles. Importación: 45 a 65 días hábiles.</p></div>
+      <div class="stage"><div class="sk">Etapa 02</div><h3>Mantenimiento</h3><p>Revisión de central, detectores, estaciones, sirenas y baterías; ajustes y pruebas funcionales.</p></div>
+      <div class="stage"><div class="sk">Etapa 03</div><h3>Entrega</h3><p>Informe técnico, resultados de pruebas, recomendaciones y capacitación básica al equipo.</p></div>
+    </div>
+
+    <div class="delivery">
+      <div class="k">Entrega recomendada</div>
+      <p>Acta de entrega, inventario, registro de pruebas, informe de hallazgos y recomendaciones, y capacitación básica para la operación.</p>
+    </div>
+
+    <div class="check-title">Antes de aprobar la orden</div>
+    <div class="check">
+      <div>Confirmar alcance y cantidad de dispositivos.</div>
+      <div>Coordinar acceso, horarios y permisos del sitio.</div>
+      <div>Verificar energía, baterías y respaldo.</div>
+      <div>Definir repuestos y consumibles incluidos.</div>
+      <div>Confirmar la fecha de inicio del mantenimiento.</div>
+      <div>Precisar el alcance de la capacitación.</div>
+    </div>
+
+    <div class="check-title">Qué revisamos en sitio</div>
+    <div class="visit">
+      <div><b>Central de control</b><span>Panel, fuentes y baterías de respaldo.</span></div>
+      <div><b>Detección</b><span>Detectores de humo y módulos de control.</span></div>
+      <div><b>Notificación</b><span>Estaciones manuales, sirenas y estrobos.</span></div>
+      <div><b>Infraestructura</b><span>Tubería EMT, cableado FPLR y soportes.</span></div>
+      <div><b>Pruebas</b><span>Detección, notificación y registro de resultados.</span></div>
+      <div><b>Entrega</b><span>Informe, recomendaciones y capacitación.</span></div>
+    </div>
+    <div class="commitment">
+      <div class="k">Nuestro compromiso</div>
+      <p>Ejecutar el mantenimiento con el sistema en operación, documentar cada prueba y dejar la instalación lista para responder.</p>
+    </div>
+    <div class="pf"><span>G&amp;G Innova Solutions · La respuesta a tu necesidad</span><span><b>OT-0039</b> · 5 / 6</span></div>
+  </div>
+</section>
+
+<!-- 06 · CIERRE -->
+<section class="page">
+  <div class="pad">
+    <div class="ph"><span>Condiciones</span><span><b>05 / Cierre</b></span></div>
+    <div class="sec-head">
+      <div class="sec-num">05</div>
+      <h1>Una propuesta para<br>avanzar con claridad</h1>
+    </div>
+    <p class="intro">Cada proyecto empieza con una conversación clara sobre alcance, tiempos, inversión y responsabilidades.</p>
+
+    <div class="cards3">
+      <div class="card-dark"><div class="k">Pago</div><div class="v">40% / 60%</div><div class="s">Anticipo a la firma y avance por ejecución.</div></div>
+      <div class="card-dark"><div class="k">Garantía</div><div class="v">1 año</div><div class="s">Por defectos de fabricación, según condiciones.</div></div>
+      <div class="card-dark"><div class="k">Instalación</div><div class="v">8 días hábiles</div><div class="s">Sujeto a disponibilidad y condiciones del sitio.</div></div>
+    </div>
+
+    <div class="two-col">
+      <div>
+        <h3>Incluye</h3>
+        <ul>
+          <li>Mantenimiento preventivo del sistema.</li>
+          <li>Pruebas de detección y notificación.</li>
+          <li>Informe técnico y recomendaciones.</li>
+          <li>Repuestos y consumibles cotizados.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>No incluye</h3>
+        <ul>
+          <li>Obras civiles, cárcamos o diques.</li>
+          <li>SISO, andamios o trabajos especiales.</li>
+          <li>Repuestos no discriminados en la oferta.</li>
+          <li>Certificación del cuerpo de bomberos.</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="approval">
+      <img class="logo" src="assets/gyg.png" alt="G&amp;G Innova Solutions">
+      <h3>Aprobación de la propuesta</h3>
+      <p>Con la aprobación de esta oferta, el cliente confirma el interés en avanzar con el alcance descrito y acepta que cualquier adicional deberá cotizarse y aprobarse por escrito antes de ejecutarse.</p>
+      <div class="signs">
+        <div class="sign"><b>GYG Innova Solutions S.A.S.</b><span>Gerencia comercial</span><span>comercial1@ggis.com.co</span></div>
+        <div class="sign"><b>BUENAVISTA</b><span>Nombre, cargo y firma</span><span>Fecha de aprobación</span></div>
+      </div>
+    </div>
+    <div class="thanks">Proteger la operación empieza por una decisión clara.</div>
+    <div class="pf"><span>G&amp;G Innova Solutions · La respuesta a tu necesidad</span><span><b>OT-0039</b> · 6 / 6</span></div>
+  </div>
+</section>
+
+</body>
+</html>
+

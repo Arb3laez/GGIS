@@ -13,7 +13,7 @@ import {
   type Currency,
   type QuoteItem,
 } from '@ggis/domain';
-import { Package } from 'lucide-react';
+import { Maximize2, Minimize2, Package } from 'lucide-react';
 import { exchangeRateApi, useCatalog } from '../../../api/queries';
 import { SectionTitle } from '../../../shared/SectionTitle';
 import { Alerts, errorMessage, useToast } from '../../../shared/feedback';
@@ -30,7 +30,13 @@ const isPipeItem = (it: QuoteItem) =>
 /** Columnas de sí/no que se pueden aplicar de una vez a todos los ítems visibles. */
 type BulkBoolField = 'applyImportCost' | 'supplierVatIncluded' | 'carriesFixedLabor';
 
-export function ItemsSection() {
+export function ItemsSection({
+  expanded,
+  onToggleExpand,
+}: {
+  expanded: boolean;
+  onToggleExpand: () => void;
+}) {
   const d = useDraft();
   const edit = useEdit();
   const breakdown = useBreakdown();
@@ -102,7 +108,21 @@ export function ItemsSection() {
 
   return (
     <section className="card" id="items" aria-labelledby="items-title">
-      <SectionTitle icon={<Package size={16} />} id="items-title">
+      <SectionTitle
+        icon={<Package size={16} />}
+        id="items-title"
+        right={
+          <button
+            type="button"
+            className="small"
+            onClick={onToggleExpand}
+            title={expanded ? 'Volver al resumen lateral' : 'Ver todas las columnas a la vez'}
+          >
+            {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+            {expanded ? 'Ver resumen' : 'Ampliar ítems'}
+          </button>
+        }
+      >
         Ítems de la cotización
       </SectionTitle>
       <div className="sub">
@@ -408,6 +428,9 @@ export function ItemsSection() {
         </span>
         <span>
           Valor venta (subtotal): <b className="big">{formatCop(t.subtotal)}</b>
+        </span>
+        <span>
+          Total oferta: <b className="big">{formatCop(t.total)}</b>
         </span>
       </div>
       <Alerts items={warnings} />

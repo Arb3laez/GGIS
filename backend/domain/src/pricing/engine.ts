@@ -49,11 +49,14 @@ export interface QuoteTotals {
   financing: number;
   contingency: number;
   adminCost: number;
-  /** Costo total = directo + pólizas + impuestos + financiamiento + imprevistos + administración. */
+  /**
+   * Costo presupuestado: en simple es directo + pólizas + impuestos + financiamiento +
+   * imprevistos + administración; en AIU es directo + A + I (sin la utilidad U).
+   */
   totalCost: number;
-  /** Utilidad esperada: subtotal − costo total. */
+  /** Utilidad: en simple es subtotal − costo total; en AIU es la U. */
   profit: number;
-  /** Valor de venta antes de IVA/AIU. */
+  /** Base del precio: valor de venta en simple; costo directo/subtotal de ítems en AIU. */
   subtotal: number;
   /** IVA sobre el subtotal (solo método simple; 0 en AIU). */
   vat: number;
@@ -135,11 +138,16 @@ export function finalizeFromSubtotal(
     return { vat, aiu: null, total: subtotal + vat };
   }
   const a = pricing.aiu;
-  const admin = r((subtotal * a.adminPct) / 100);
-  const contingency = r((subtotal * a.contingencyPct) / 100);
-  const profit = r((subtotal * a.profitPct) / 100);
+  const exactAdmin = (subtotal * a.adminPct) / 100;
+  const exactContingency = (subtotal * a.contingencyPct) / 100;
+  const exactProfit = (subtotal * a.profitPct) / 100;
+  const admin = r(exactAdmin);
+  const contingency = r(exactContingency);
+  const profit = r(exactProfit);
   const aiuSubtotal = subtotal + admin + contingency + profit;
-  const vatOnProfit = r((profit * a.vatOnProfitPct) / 100);
+  // El IVA se calcula sobre la utilidad exacta, no sobre la ya redondeada: así el total
+  // coincide al peso con la oferta comercial y con el AIU del pliego.
+  const vatOnProfit = r((exactProfit * a.vatOnProfitPct) / 100);
   return {
     vat: 0,
     aiu: { admin, contingency, profit, subtotal: aiuSubtotal, vatOnProfit },
@@ -170,12 +178,17 @@ export function computeQuote(draft: QuoteDraft): QuoteBreakdown {
     return { item, unitMaterialCost, unitLaborCost, assignedFixedLabor, totalCost };
   });
 
-  // 2) Totales de costo y precio objetivo (exacto, con decimales)
+  // 2) Totales de costo y precio objetivo (exacto, con decimales).
+  // En AIU la base es el costo directo: A/I/U reemplazan el margen y los costos internos.
   const directCost = materials + itemLabor + laborActivities + staff + otherCosts;
-  const oh = overheadsOn(directCost, draft.pricing);
-  const totalCost = oh.total;
-  const m = marginFraction(draft.pricing);
-  const targetSubtotal = totalCost / (1 - m);
+  const aiuMode = draft.pricing.method === 'aiu';
+  const oh = aiuMode
+    ? { policies: 0, taxes: 0, financing: 0, contingency: 0, adminCost: 0, total: directCost }
+    : overheadsOn(directCost, draft.pricing);
+  const costBeforeAiu = oh.total;
+  const targetSubtotal = aiuMode
+    ? directCost
+    : costBeforeAiu / (1 - marginFraction(draft.pricing));
 
   // 3) Reparto del precio SOLO entre los ítems que salen en la oferta (con descripción y cantidad).
   // Los que tienen precio fijado lo conservan; el resto se reparte el remanente según su costo
@@ -226,9 +239,13 @@ export function computeQuote(draft: QuoteDraft): QuoteBreakdown {
   // cliente. Sin ítems facturables no hay nada que cobrar (la web muestra un aviso).
   const subtotal = items.reduce((s, i) => s + i.saleTotal, 0);
 
-  // 6) IVA o AIU sobre el subtotal, y utilidad esperada.
+  // 6) IVA o AIU sobre el subtotal. En AIU el costo presupuestado es el costo directo
+  // más la administración y los imprevistos (A + I); la utilidad es U.
   const final = finalizeFromSubtotal(subtotal, draft.pricing, true);
-  const profit = subtotal - totalCost;
+  const totalCost = aiuMode
+    ? subtotal + (final.aiu?.admin ?? 0) + (final.aiu?.contingency ?? 0)
+    : costBeforeAiu;
+  const profit = aiuMode ? (final.aiu?.profit ?? 0) : subtotal - costBeforeAiu;
 
   return {
     totals: {
@@ -259,6 +276,27 @@ export function computeQuote(draft: QuoteDraft): QuoteBreakdown {
  * (por ejemplo, el costo real de ejecución), con los mismos porcentajes y método de la cotización.
  */
 export function priceForTargetMargin(cost: number, targetMarginPct: number, pricing: Pricing) {
+  if (pricing.method === 'aiu') {
+    // En AIU se busca que U / total = margen objetivo. A e I se mantienen como porcentajes
+    // del costo y el IVA se aplica solo sobre U.
+    const a = pricing.aiu;
+    const m = Math.min(Math.max(targetMarginPct, 0), 95) / 100;
+    const v = a.vatOnProfitPct / 100;
+    const denom = 1 - m * (1 + v);
+    if (denom <= 0) {
+      const final = finalizeFromSubtotal(cost, pricing);
+      return { subtotal: cost, ...final };
+    }
+    const profitPct = Math.min(
+      95,
+      ((m * (1 + a.adminPct / 100 + a.contingencyPct / 100)) / denom) * 100,
+    );
+    const final = finalizeFromSubtotal(cost, {
+      ...pricing,
+      aiu: { ...a, profitPct },
+    });
+    return { subtotal: cost, ...final };
+  }
   const base = overheadsOn(cost, pricing).total;
   const subtotal = base / (1 - targetMarginPct / 100);
   const final = finalizeFromSubtotal(subtotal, pricing);

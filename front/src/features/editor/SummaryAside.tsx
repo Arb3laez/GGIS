@@ -14,7 +14,7 @@ function Row({
   /** Porcentaje que se muestra entre paréntesis al lado del valor. */
   pct?: number;
   strong?: boolean;
-  /** Línea superior para separar los totales (costo total y subtotal). */
+  /** Línea superior para separar los totales. */
   top?: boolean;
 }) {
   return (
@@ -34,6 +34,7 @@ export function SummaryAside() {
   const breakdown = useBreakdown();
   const t = breakdown.totals;
   const p = d.pricing;
+  const aiuMode = p.method === 'aiu';
   const nego = negotiationFloor(t);
   const warnings = quoteWarnings(d, breakdown).filter((w) => w.level === 'danger' || w.level === 'warning');
   const marginColor =
@@ -50,39 +51,53 @@ export function SummaryAside() {
         <Row label="Mano de obra (instalación + personal)" value={formatCop(t.itemLabor + t.staff)} />
         <Row label="Mano de obra por actividad" value={formatCop(t.laborActivities)} />
         <Row label="Otros costos del proyecto" value={formatCop(t.otherCosts)} />
-        <Row
-          label="Costo directo (mat + M.O. + personal + otros)"
-          value={formatCop(t.directCost)}
-          strong
-        />
 
-        <Row label="Pólizas" value={formatCop(t.policies)} pct={p.policiesPct} />
-        <Row label="Impuestos" value={formatCop(t.taxes)} pct={p.taxesPct} />
-        <Row label="Financiamiento" value={formatCop(t.financing)} pct={p.financingPct} />
-        <Row label="Imprevistos" value={formatCop(t.contingency)} pct={p.contingencyPct} />
-        <Row label="Administración" value={formatCop(t.adminCost)} pct={p.adminPct} />
-
-        <Row label="= COSTO TOTAL" value={formatCop(t.totalCost)} strong top />
-        <Row
-          label="Utilidad esperada sobre el costo total"
-          value={formatCop(t.profit)}
-          pct={p.marginPct}
-        />
-        <Row label="SUBTOTAL (valor venta)" value={formatCop(t.subtotal)} strong top />
-
-        {t.aiu ? (
+        {aiuMode ? (
           <>
-            <Row label="Administración" value={formatCop(t.aiu.admin)} pct={p.aiu.adminPct} />
-            <Row label="Imprevisto" value={formatCop(t.aiu.contingency)} pct={p.aiu.contingencyPct} />
-            <Row label="Utilidad" value={formatCop(t.aiu.profit)} pct={p.aiu.profitPct} />
-            <Row
-              label="IVA sobre la utilidad"
-              value={formatCop(t.aiu.vatOnProfit)}
-              pct={p.aiu.vatOnProfitPct}
-            />
+            <Row label="SUBTOTAL (costo directo)" value={formatCop(t.subtotal)} strong top />
+            {t.aiu ? (
+              <>
+                <Row
+                  label="Administración"
+                  value={formatCop(t.aiu.admin)}
+                  pct={p.aiu.adminPct}
+                />
+                <Row
+                  label="Imprevistos"
+                  value={formatCop(t.aiu.contingency)}
+                  pct={p.aiu.contingencyPct}
+                />
+                <Row label="Utilidad" value={formatCop(t.aiu.profit)} pct={p.aiu.profitPct} />
+                <Row
+                  label="IVA sobre la utilidad"
+                  value={formatCop(t.aiu.vatOnProfit)}
+                  pct={p.aiu.vatOnProfitPct}
+                />
+              </>
+            ) : null}
           </>
         ) : (
-          <Row label="IVA" value={formatCop(t.vat)} pct={p.vatPct} />
+          <>
+            <Row
+              label="Costo directo (mat + M.O. + personal + otros)"
+              value={formatCop(t.directCost)}
+              strong
+            />
+            <Row label="Pólizas" value={formatCop(t.policies)} pct={p.policiesPct} />
+            <Row label="Impuestos" value={formatCop(t.taxes)} pct={p.taxesPct} />
+            <Row label="Financiamiento" value={formatCop(t.financing)} pct={p.financingPct} />
+            <Row label="Imprevistos" value={formatCop(t.contingency)} pct={p.contingencyPct} />
+            <Row label="Administración" value={formatCop(t.adminCost)} pct={p.adminPct} />
+
+            <Row label="= COSTO TOTAL" value={formatCop(t.totalCost)} strong top />
+            <Row
+              label="Utilidad esperada sobre el costo total"
+              value={formatCop(t.profit)}
+              pct={p.marginPct}
+            />
+            <Row label="SUBTOTAL (valor venta)" value={formatCop(t.subtotal)} strong top />
+            <Row label="IVA" value={formatCop(t.vat)} pct={p.vatPct} />
+          </>
         )}
 
         <div className="srow total">
@@ -90,31 +105,53 @@ export function SummaryAside() {
           <span>{formatCop(t.total)}</span>
         </div>
 
-        <div className="nego-block">
-          <div className="nego-title">Margen y piso de negociación</div>
-          <div className="nego-row">
-            <span>Margen bruto real sobre venta</span>
-            <b style={{ color: marginColor }}>{formatPct(nego.grossMarginPct)}</b>
+        {aiuMode ? (
+          <div className="nego-block">
+            <div className="nego-title">AIU</div>
+            <div className="nego-row">
+              <span>Base AIU (costo directo)</span>
+              <b>{formatCop(t.subtotal)}</b>
+            </div>
+            <div className="nego-row">
+              <span>Utilidad U</span>
+              <b>{formatPct(p.aiu.profitPct, 0)}</b>
+            </div>
+            <div className="nego-row">
+              <span>Precio piso (costo + A + I)</span>
+              <b>{formatCop(t.totalCost)}</b>
+            </div>
+            <div className="nego-row">
+              <span>IVA</span>
+              <b>solo sobre la utilidad</b>
+            </div>
           </div>
-          <div className="nego-row">
-            <span>Descuento máx. sin perder plata</span>
-            <b>{formatPct(nego.maxDiscountPct)}</b>
+        ) : (
+          <div className="nego-block">
+            <div className="nego-title">Margen y piso de negociación</div>
+            <div className="nego-row">
+              <span>Margen bruto real sobre venta</span>
+              <b style={{ color: marginColor }}>{formatPct(nego.grossMarginPct)}</b>
+            </div>
+            <div className="nego-row">
+              <span>Descuento máx. sin perder plata</span>
+              <b>{formatPct(nego.maxDiscountPct)}</b>
+            </div>
+            <div className="nego-row">
+              <span>Descuento máx. dejando 15% de utilidad</span>
+              <b style={{ color: 'var(--warn)' }}>{formatPct(nego.discountKeepingFloorPct)}</b>
+            </div>
+            <div className="nego-row">
+              <span>Precio piso recomendado</span>
+              <b>{formatCop(nego.floorPrice)}</b>
+            </div>
+            {nego.belowIndustryReference ? (
+              <p className="nego-warn">
+                ⚠ Margen por debajo del 28%: la referencia de la industria de integración indica que el
+                gasto administrativo suele consumir cerca de eso.
+              </p>
+            ) : null}
           </div>
-          <div className="nego-row">
-            <span>Descuento máx. dejando 15% de utilidad</span>
-            <b style={{ color: 'var(--warn)' }}>{formatPct(nego.discountKeepingFloorPct)}</b>
-          </div>
-          <div className="nego-row">
-            <span>Precio piso recomendado</span>
-            <b>{formatCop(nego.floorPrice)}</b>
-          </div>
-          {nego.belowIndustryReference ? (
-            <p className="nego-warn">
-              ⚠ Margen por debajo del 28%: la referencia de la industria de integración indica que el
-              gasto administrativo suele consumir cerca de eso.
-            </p>
-          ) : null}
-        </div>
+        )}
       </div>
     </aside>
   );

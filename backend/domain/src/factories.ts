@@ -40,10 +40,16 @@ export function blankItem(description = '', unit = ''): QuoteItem {
   };
 }
 
-export function blankStaffMember(role = '', monthlySalary = MINIMUM_WAGE_2026, transportAllowance = true): StaffMember {
+export function blankStaffMember(
+  role = '',
+  monthlySalary = MINIMUM_WAGE_2026,
+  transportAllowance = true,
+  quantity = 1,
+): StaffMember {
   return {
     id: newRowId(),
     role,
+    quantity,
     monthlySalary,
     benefitsFactor: DEFAULT_BENEFITS_FACTOR,
     transportAllowance,
@@ -65,20 +71,32 @@ export function blankCostLine(concept = ''): CostLine {
   return { id: newRowId(), concept, quantity: 1, unitPrice: 0 };
 }
 
+/** Cargo típico con su salario y auxilio de transporte sugeridos. */
+export interface StaffRolePreset {
+  role: string;
+  monthlySalary: number;
+  transportAllowance: boolean;
+}
+
+/** Cargos típicos que el editor usa para autocompletar salario, factor y auxilio. */
+export const STAFF_ROLE_PRESETS: readonly StaffRolePreset[] = [
+  {
+    role: 'Ingeniero residente (incendios + seguridad electrónica: CCTV, intrusión, control de acceso)',
+    monthlySalary: 3_510_000,
+    transportAllowance: false,
+  },
+  { role: 'Inspector SISO', monthlySalary: MINIMUM_WAGE_2026, transportAllowance: false },
+  { role: 'Técnico líder', monthlySalary: 2_100_000, transportAllowance: true },
+  { role: 'Técnico auxiliar', monthlySalary: 2_000_000, transportAllowance: true },
+  { role: 'Técnico básico ayudante', monthlySalary: MINIMUM_WAGE_2026, transportAllowance: true },
+  { role: 'Técnico almacenista', monthlySalary: MINIMUM_WAGE_2026, transportAllowance: true },
+];
+
 /** Cargos típicos de un proyecto; los días inician en 0. */
 export function defaultStaff(): StaffMember[] {
-  return [
-    blankStaffMember(
-      'Ingeniero residente (incendios + seguridad electrónica: CCTV, intrusión, control de acceso)',
-      3_510_000,
-      false,
-    ),
-    blankStaffMember('Inspector SISO', MINIMUM_WAGE_2026, false),
-    blankStaffMember('Técnico líder', 2_100_000, true),
-    blankStaffMember('Técnico auxiliar', 2_000_000, true),
-    blankStaffMember('Técnico básico ayudante', MINIMUM_WAGE_2026, true),
-    blankStaffMember('Técnico almacenista', MINIMUM_WAGE_2026, true),
-  ];
+  return STAFF_ROLE_PRESETS.map((p) =>
+    blankStaffMember(p.role, p.monthlySalary, p.transportAllowance),
+  );
 }
 
 export function itemsFromTemplate(solution: Solution): QuoteItem[] {
@@ -125,7 +143,7 @@ export function createEmptyDraft(now: Date = new Date()): QuoteDraft {
       contingencyPct: 3,
       adminPct: 5,
       vatPct: 19,
-      aiu: { adminPct: 8, contingencyPct: 4, profitPct: 4, vatOnProfitPct: 19 },
+      aiu: { adminPct: 10, contingencyPct: 4, profitPct: 4, vatOnProfitPct: 19 },
     },
     terms: {
       deliveryNational: '30 días hábiles',

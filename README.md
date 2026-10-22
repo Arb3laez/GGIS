@@ -91,8 +91,9 @@ npm run typecheck
 npm run lint
 ```
 
-- 236 pruebas del dominio, incluidas 200 de **paridad** contra las fórmulas originales de la v68.
+- 245 pruebas del dominio, incluidas 200 de **paridad** del método simple contra las fórmulas originales de la v68.
 - 19 pruebas de integración HTTP del backend (SQLite en memoria).
+- El AIU se calcula en una sola capa sobre el costo directo: A + I + U, con IVA solo sobre la U y redondeo del IVA desde la utilidad exacta.
 
 ## Estructura
 
@@ -125,8 +126,7 @@ front/
 ## Pendientes recomendados
 
 1. **Autenticación** (SSO corporativo o detrás de un proxy con autenticación) antes de exponer la app en la red. Hoy solo escucha en el equipo local.
-2. **Validar con el área comercial/contable** dos reglas heredadas de la v68 que se mantuvieron igual a propósito:
-   - En AIU, la administración e imprevistos internos ya están en el subtotal y se suma además el AIU al cliente.
+2. **Validar con el área comercial/contable** dos reglas heredadas de la v68:
    - El IVA del proveedor (`¿+IVA 19%?`) se suma como costo; si es IVA descontable, infla el costo.
    - Los márgenes del cierre y de los indicadores comparan contra el total **con IVA** (igual que la v68).
 3. PostgreSQL si varias personas van a usarlo a la vez desde distintos equipos.

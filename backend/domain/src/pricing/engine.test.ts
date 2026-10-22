@@ -1,8 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { blankItem, blankStaffMember, createEmptyDraft } from '../factories';
+import { blankItem, blankStaffMember, createEmptyDraft, STAFF_ROLE_PRESETS } from '../factories';
 import type { QuoteDraft } from '../schemas';
 import { computeQuote, priceForTargetMargin } from './engine';
-import { overtimeCost, staffMemberCost } from './labor';
+import {
+  consolidateStaff,
+  overtimeCost,
+  staffMemberCost,
+  staffMemberQuantity,
+  staffMemberTotal,
+  staffSubtotal,
+} from './labor';
 import { legacyCompute } from './legacy-reference.test-helper';
 
 const COMPLEXITY_TO_LEGACY = { low: 'baja', medium: 'media', high: 'alta' } as const;
@@ -73,7 +80,9 @@ function randomDraft(seed: number): QuoteDraft {
   const d = createEmptyDraft(new Date('2026-10-01'));
   d.exchangeRate = 3800 + Math.round(r() * 600);
   d.importCostPct = Math.round(r() * 15);
-  d.pricing.method = pick(['simple', 'aiu'] as const);
+  // La paridad con la v68 se conserva para el método simple: el AIU cambió a propósito
+  // a una sola capa sobre el costo directo (ver pruebas de AIU más abajo).
+  d.pricing.method = 'simple';
   d.pricing.marginPct = Math.round(r() * 40);
   d.items = Array.from({ length: 1 + Math.floor(r() * 8) }, (_, i) => ({
     ...blankItem(r() < 0.1 ? '' : `Ítem ${i}`, 'UN'),
@@ -233,6 +242,55 @@ describe('computeQuote — casos calculados a mano', () => {
   });
 });
 
+describe('AIU — una sola capa sobre el costo directo', () => {
+  it('reproduce el AIU del PDF: 10/4/4 y IVA sobre la U exacta', () => {
+    const d = createEmptyDraft();
+    d.staff = [];
+    d.items = [
+      { ...blankItem('Sistema', 'UN'), quantity: 1, unitPrice: 31_774_806, laborPct: 0 },
+    ];
+    d.pricing = {
+      ...d.pricing,
+      method: 'aiu',
+      marginPct: 30,
+      policiesPct: 5,
+      taxesPct: 7,
+      financingPct: 1,
+      contingencyPct: 3,
+      adminPct: 5,
+      aiu: { adminPct: 10, contingencyPct: 4, profitPct: 4, vatOnProfitPct: 19 },
+    };
+    const { totals } = computeQuote(d);
+
+    expect(totals.subtotal).toBe(31_774_806);
+    expect(totals.aiu).toMatchObject({
+      admin: 3_177_481,
+      contingency: 1_270_992,
+      profit: 1_270_992,
+      vatOnProfit: 241_489,
+    });
+    expect(totals.total).toBe(37_735_760);
+    expect(totals.totalCost).toBe(36_223_279);
+    expect(totals.profit).toBe(1_270_992);
+    // El margen y los costos internos no se aplican en AIU.
+    expect(totals.policies).toBe(0);
+    expect(totals.adminCost).toBe(0);
+  });
+
+  it('en AIU el precio para un margen objetivo deja U/total = margen', () => {
+    const d = createEmptyDraft();
+    d.pricing = {
+      ...d.pricing,
+      method: 'aiu',
+      aiu: { adminPct: 10, contingencyPct: 4, profitPct: 4, vatOnProfitPct: 19 },
+    };
+    const p = priceForTargetMargin(1_000_000, 20, d.pricing);
+    expect(p.subtotal).toBe(1_000_000);
+    expect(p.aiu).not.toBeNull();
+    expect(p.aiu!.profit / p.total).toBeCloseTo(0.2, 6);
+  });
+});
+
 describe('nómina', () => {
   it('días trabajados + horas extra con factor prestacional', () => {
     const m = { ...blankStaffMember('Técnico', 2_100_000, true), days: 15, hasOvertime: true };
@@ -243,5 +301,69 @@ describe('nómina', () => {
       ((2_100_000 * 1.58 + 249_095) / 30) * 15 + hour * 1.75 * 4 * 1.58,
       6,
     );
+  });
+
+  it('multiplica el costo por la cantidad de personas', () => {
+    const m = { ...blankStaffMember('Técnico', 2_100_000, true), days: 15, quantity: 2 };
+    expect(staffMemberQuantity(m)).toBe(2);
+    expect(staffMemberTotal(m)).toBeCloseTo(staffMemberCost(m) * 2, 6);
+    expect(staffSubtotal([m])).toBeCloseTo(staffMemberCost(m) * 2, 6);
+  });
+
+  it('consolida cargos del mismo perfil y conserva el total', () => {
+    const base = { ...blankStaffMember('Técnico líder', 2_100_000, true), days: 120 };
+    const a = { ...base, id: 'a', quantity: 2 };
+    const b = { ...base, id: 'b', quantity: 1 };
+    const c = { ...base, id: 'c', monthlySalary: 1_750_905, quantity: 1 };
+    const blank1 = { ...blankStaffMember('', 0, false), id: 'd' };
+    const blank2 = { ...blankStaffMember('', 0, false), id: 'e' };
+
+    const before = staffSubtotal([a, b, c, blank1, blank2]);
+    const consolidated = consolidateStaff([a, b, c, blank1, blank2]);
+
+    expect(consolidated).toHaveLength(4);
+    expect(consolidated[0]!.quantity).toBe(3);
+    expect(consolidated[1]!.quantity).toBe(1);
+    expect(staffSubtotal(consolidated)).toBeCloseTo(before, 6);
+  });
+
+  it('computeQuote usa la cantidad en el costo de personal', () => {
+    const d = createEmptyDraft();
+    d.items = [];
+    d.laborActivities = [];
+    d.otherCosts = [];
+    d.staff = [{ ...blankStaffMember('Técnico', 2_100_000, true), days: 15, quantity: 2 }];
+    const { totals } = computeQuote(d);
+    expect(totals.staff).toBeCloseTo(staffMemberCost(d.staff[0]!) * 2, 6);
+  });
+
+  it('liquida cada concepto de horas extra con su tarifa', () => {
+    const base = {
+      ...blankStaffMember('Técnico', 2_100_000, false),
+      benefitsFactor: 1,
+      days: 0,
+      hasOvertime: true,
+    };
+    const rate = 2_100_000 / 210;
+    const cases: Array<[keyof typeof base.overtime, number]> = [
+      ['extraDay', 1.25],
+      ['extraNight', 1.75],
+      ['nightSurcharge', 0.35],
+      ['holidayDay', 0.9],
+      ['holidayNight', 1.25],
+      ['holidayExtraDay', 2.15],
+      ['holidayExtraNight', 2.65],
+    ];
+    for (const [key, multiplier] of cases) {
+      const m = { ...base, overtime: { ...base.overtime, [key]: 1 } };
+      expect(overtimeCost(m)).toBeCloseTo(rate * multiplier, 6);
+    }
+  });
+
+  it('los cargos sugeridos traen salario y auxilio', () => {
+    const siso = STAFF_ROLE_PRESETS.find((p) => p.role === 'Inspector SISO');
+    expect(siso).toMatchObject({ monthlySalary: 1_750_905, transportAllowance: false });
+    const lider = STAFF_ROLE_PRESETS.find((p) => p.role === 'Técnico líder');
+    expect(lider?.monthlySalary).toBe(2_100_000);
   });
 });

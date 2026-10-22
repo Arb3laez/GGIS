@@ -119,6 +119,10 @@ a {
   margin: 0 auto;
   padding: 18px 20px 90px;
 }
+/* El editor de cotizaciones usa todo el ancho disponible para que la tabla de ítems quepa. */
+.wrap:has(.editor-layout) {
+  max-width: 1900px;
+}
 .shell {
   background: var(--shell);
   border: 1px solid var(--shell-line);
@@ -1259,6 +1263,14 @@ tbody tr:hover td {
   flex-direction: column;
   gap: 12px;
 }
+/* Modo ampliado de ítems: la tabla ocupa todo el ancho y el resumen se oculta. */
+.editor-layout.items-wide {
+  grid-template-columns: minmax(0, 1fr);
+}
+.editor-layout.items-wide > aside {
+  display: none;
+}
+
 section[id] {
   scroll-margin-top: 70px;
 }
@@ -1456,6 +1468,28 @@ section[id] {
 .bulk-field .cell {
   width: 64px;
 }
+/* Vista previa del AIU en la sección Precio */
+.aiu-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+.aiu-preview > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.aiu-preview b {
+  font-size: 14px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
 .empty {
   color: var(--text-3);
   font-size: 13px;
@@ -1618,11 +1652,20 @@ section[id] {
 }
 
 @media print {
+  @page {
+    size: A4;
+    margin: 0;
+  }
   html,
   body {
     background: #fff !important;
   }
+  .wrap {
+    max-width: none !important;
+    padding: 0 !important;
+  }
   .shell {
+    min-height: 0 !important;
     border: none;
     padding: 0;
     background: #fff;
@@ -1630,38 +1673,85 @@ section[id] {
   .no-print {
     display: none !important;
   }
+  [aria-live='polite'] {
+    display: none !important;
+  }
+  .offer-page {
+    max-width: 210mm !important;
+    width: 210mm !important;
+    margin: 0 !important;
+  }
   .offer-frame {
+    width: 210mm;
+    max-width: 210mm;
     box-shadow: none;
     border-radius: 0;
+    overflow: visible;
+  }
+  .oferta-doc {
+    max-width: none;
   }
 }
 
 /* Tabla de ítems: anchos mínimos para que ningún valor se corte; se desplaza horizontalmente */
 .items-table {
-  min-width: 1380px;
+  min-width: 1220px;
 }
 .items-table th.col-xs,
 .items-table td:has(> .cell) {
-  min-width: 64px;
+  min-width: 44px;
 }
 .items-table th.col-sm {
-  min-width: 96px;
+  min-width: 72px;
 }
 .items-table th.col-md {
-  min-width: 128px;
+  min-width: 92px;
 }
 .items-table th.col-desc {
-  min-width: 280px;
+  min-width: 220px;
+}
+.items-table select.cell {
+  padding: 4px;
+  font-size: 11px;
 }
 .items-table thead th {
   white-space: normal;
   line-height: 1.3;
+}
+/* En modo ampliado se compactan las columnas para que quepan todas a la vez */
+.editor-layout.items-wide .items-table {
+  min-width: 1040px;
+}
+.editor-layout.items-wide .items-table th.col-xs,
+.editor-layout.items-wide .items-table td:has(> .cell) {
+  min-width: 40px;
+}
+.editor-layout.items-wide .items-table th.col-sm {
+  min-width: 68px;
+}
+.editor-layout.items-wide .items-table th.col-md {
+  min-width: 80px;
+}
+.editor-layout.items-wide .items-table th.col-desc {
+  min-width: 200px;
+}
+.editor-layout.items-wide .items-table .cell {
+  padding: 5px;
+  font-size: 12px;
+}
+.editor-layout.items-wide .items-table select.cell {
+  padding: 4px;
+  font-size: 11px;
+}
+.editor-layout.items-wide .items-table .row-actions {
+  width: 60px;
 }
 /* Acciones (duplicar / eliminar) siempre visibles aunque la tabla se desplace */
 .items-table th.row-actions,
 .items-table td.row-actions {
   position: sticky;
   right: 0;
+  width: 60px;
   background: var(--panel);
   box-shadow: -8px 0 10px -10px rgba(0, 0, 0, 0.35);
   z-index: 2;

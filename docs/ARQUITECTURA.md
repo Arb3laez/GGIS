@@ -78,3 +78,26 @@ Errores: siempre `{"error": {"code", "message", "details?"}}`, con códigos HTTP
 | PDF con html2pdf (imagen rasterizada) | Imprimir → Guardar como PDF (texto real) + HTML descargable | El PDF queda con texto seleccionable y más liviano. |
 | Datos de la empresa y firma en el código | Pantalla de Configuración | Se cambian sin tocar código. |
 | Recalcular todo O(n²) en cada tecla | Una pasada O(n) memoizada | Rendimiento con muchos ítems. |
+| AIU sobre un subtotal que ya incluía margen y costos internos | AIU en una sola capa sobre el costo directo | Evita cobrar dos veces administración, imprevistos y utilidad; coincide con el AIU de licitación. |
+
+## AIU
+
+El método AIU usa el **costo directo** como base:
+
+```text
+A   = CD × %A
+I   = CD × %I
+U   = CD × %U
+IVA = U × %IVA
+Total = CD + A + I + U + IVA
+```
+
+No se suman margen ni costos internos aparte. `suggestAiu` propone los porcentajes según el tamaño del proyecto, la solución, el tipo de servicio, la complejidad, el peso de la mano de obra, los importados y la forma de pago.
+
+## Personal fijo
+
+Cada fila de personal representa un **cargo con su perfil de pago** (salario, factor prestacional, auxilio, días y horas extra) y tiene una `quantity` con el número de personas. El costo del cargo es el costo por persona × cantidad.
+
+`consolidateStaff` agrupa las filas repetidas del mismo perfil sumando cantidades. El editor lo hace al salir del campo Cargo y con el botón **Consolidar cargos**, para que no se repita el mismo cargo cuando hay dos, tres o cuatro personas.
+
+Los cargos típicos de `STAFF_ROLE_PRESETS` autocompletan salario, factor prestacional y auxilio de transporte al elegirlos. Las horas extra se cargan por concepto y se clasifican en **día de semana (lunes a sábado)** o **domingo o festivo**; el selector muestra la tarifa por hora y el panel liquida horas extra, recargos nocturnos y festivos con las tarifas legales. El sábado se liquida como día de semana salvo que sea festivo.

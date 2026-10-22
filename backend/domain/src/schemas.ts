@@ -70,6 +70,8 @@ export const overtimeHoursSchema = z.object({
 export const staffMemberSchema = z.object({
   id,
   role: text(200),
+  /** Número de personas con el mismo cargo y el mismo perfil de pago. */
+  quantity: z.number().int().min(1).max(999).default(1),
   monthlySalary: money,
   benefitsFactor: z.number().finite().min(0).max(5),
   transportAllowance: z.boolean(),

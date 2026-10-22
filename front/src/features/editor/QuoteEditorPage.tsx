@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   LABOR_ACTIVITY_PRESETS,
@@ -60,6 +60,9 @@ export function QuoteEditorPage() {
   const navItems = SECTIONS.filter((x) => x.id !== 'cierre' || draft.status === 'won');
   const active = useScrollSpy(navItems.map((x) => x.id));
   const loadedKey = useRef<string | null>(null);
+  const [itemsWide, setItemsWide] = useState(
+    () => new URLSearchParams(window.location.search).get('wide') === '1',
+  );
 
   // Cargar la cotización del servidor (o empezar una nueva).
   useEffect(() => {
@@ -265,11 +268,11 @@ export function QuoteEditorPage() {
         ))}
       </nav>
 
-      <div className="editor-layout">
+      <div className={`editor-layout${itemsWide ? ' items-wide' : ''}`}>
         <div>
           <SolutionPicker />
           <ClientSection />
-          <ItemsSection />
+          <ItemsSection expanded={itemsWide} onToggleExpand={() => setItemsWide((v) => !v)} />
           <AttachmentsSection />
           <StaffSection />
           <CostLinesSection

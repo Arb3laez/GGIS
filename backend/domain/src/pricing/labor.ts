@@ -35,13 +35,63 @@ export function monthlyLoadedCost(member: StaffMember): number {
   );
 }
 
-/** (Mensual cargado ÷ 30) × días trabajados + horas extra. */
+/** (Mensual cargado ÷ 30) × días trabajados + horas extra. Costo de UNA persona. */
 export function staffMemberCost(member: StaffMember): number {
   return (monthlyLoadedCost(member) / 30) * member.days + overtimeCost(member);
 }
 
+/** Cantidad de personas del cargo, con respaldo para cotizaciones viejas sin el campo. */
+export function staffMemberQuantity(member: StaffMember): number {
+  const q = member.quantity ?? 1;
+  return Number.isFinite(q) && q >= 1 ? Math.floor(q) : 1;
+}
+
+/** Costo total del cargo: costo por persona × cantidad de personas. */
+export function staffMemberTotal(member: StaffMember): number {
+  return staffMemberCost(member) * staffMemberQuantity(member);
+}
+
 export function staffSubtotal(staff: readonly StaffMember[]): number {
-  return staff.reduce((sum, m) => sum + staffMemberCost(m), 0);
+  return staff.reduce((sum, m) => sum + staffMemberTotal(m), 0);
+}
+
+/** Perfil que debe coincidir para consolidar dos filas en un solo cargo con cantidad. */
+export function staffMemberKey(member: StaffMember): string {
+  return JSON.stringify({
+    role: member.role.trim().toLowerCase(),
+    monthlySalary: member.monthlySalary,
+    benefitsFactor: member.benefitsFactor,
+    transportAllowance: member.transportAllowance,
+    days: member.days,
+    hasOvertime: member.hasOvertime,
+    overtime: member.overtime,
+  });
+}
+
+/**
+ * Agrupa filas repetidas del mismo cargo y mismo perfil de pago en una sola fila,
+ * sumando la cantidad de personas. Las filas sin cargo se dejan intactas.
+ */
+export function consolidateStaff(staff: readonly StaffMember[]): StaffMember[] {
+  const out: StaffMember[] = [];
+  const byKey = new Map<string, StaffMember>();
+
+  for (const m of staff) {
+    if (!m.role.trim()) {
+      out.push({ ...m, overtime: { ...m.overtime } });
+      continue;
+    }
+    const key = staffMemberKey(m);
+    const existing = byKey.get(key);
+    if (existing) {
+      existing.quantity = staffMemberQuantity(existing) + staffMemberQuantity(m);
+    } else {
+      const copy = { ...m, quantity: staffMemberQuantity(m), overtime: { ...m.overtime } };
+      byKey.set(key, copy);
+      out.push(copy);
+    }
+  }
+  return out;
 }
 
 export function costLineTotal(line: CostLine): number {

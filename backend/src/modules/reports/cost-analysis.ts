@@ -11,6 +11,8 @@ import {
   SERVICE_TYPE_LABELS,
   safeFileName,
   staffMemberCost,
+  staffMemberQuantity,
+  staffMemberTotal,
   type CompanyProfile,
   type Quote,
 } from '@ggis/domain';
@@ -25,6 +27,7 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
   const pct = (part: number) => (t.total > 0 ? `${((part / t.total) * 100).toFixed(1)}%` : '0%');
   const r = Math.round;
   const p = quote.pricing;
+  const aiuMode = p.method === 'aiu';
   const method = PRICING_METHOD_LABELS[p.method];
   const header = (title: string) => [
     [`${company.legalName} · Análisis de costos`],
@@ -61,48 +64,73 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
     ['3. Mano de obra por actividad', '', '', '', r(t.laborActivities), pct(t.laborActivities)],
     ['4. Personal fijo del proyecto', '', '', '', r(t.staff), pct(t.staff)],
     ['5. Otros costos del proyecto', '', '', '', r(t.otherCosts), pct(t.otherCosts)],
-    ['= COSTO DIRECTO', '', '', '', r(t.directCost), pct(t.directCost)],
-    [`6. Pólizas (${p.policiesPct}% sobre costo directo)`, '', '', '', r(t.policies), pct(t.policies)],
-    [`7. Impuestos (${p.taxesPct}% sobre costo directo)`, '', '', '', r(t.taxes), pct(t.taxes)],
     [
-      `8. Financiamiento (${p.financingPct}% sobre costo directo)`,
+      aiuMode ? '= SUBTOTAL (costo directo)' : '= COSTO DIRECTO',
       '',
       '',
       '',
-      r(t.financing),
-      pct(t.financing),
+      r(aiuMode ? t.subtotal : t.directCost),
+      pct(aiuMode ? t.subtotal : t.directCost),
     ],
-    [`9. Imprevistos internos (${p.contingencyPct}%)`, '', '', '', r(t.contingency), pct(t.contingency)],
-    [`10. Administración interna (${p.adminPct}%)`, '', '', '', r(t.adminCost), pct(t.adminCost)],
-    ['= COSTO TOTAL DEL PROYECTO', '', '', '', r(t.totalCost), pct(t.totalCost)],
-    [`+ UTILIDAD (${p.marginPct}% sobre el precio de venta)`, '', '', '', r(t.profit), pct(t.profit)],
-    ['= SUBTOTAL (valor de venta)', '', '', '', r(t.subtotal), pct(t.subtotal)],
   ];
-  if (t.aiu) {
-    summary.push(
-      [`+ Administración AIU (${p.aiu.adminPct}%)`, '', '', '', r(t.aiu.admin), pct(t.aiu.admin)],
-      [
-        `+ Imprevisto AIU (${p.aiu.contingencyPct}%)`,
-        '',
-        '',
-        '',
-        r(t.aiu.contingency),
-        pct(t.aiu.contingency),
-      ],
-      [`+ Utilidad AIU (${p.aiu.profitPct}%)`, '', '', '', r(t.aiu.profit), pct(t.aiu.profit)],
-      [
-        `+ IVA sobre utilidad (${p.aiu.vatOnProfitPct}%)`,
-        '',
-        '',
-        '',
-        r(t.aiu.vatOnProfit),
-        pct(t.aiu.vatOnProfit),
-      ],
-    );
+  if (aiuMode) {
+    if (t.aiu) {
+      summary.push(
+        [`+ Administración A (${p.aiu.adminPct}%)`, '', '', '', r(t.aiu.admin), pct(t.aiu.admin)],
+        [
+          `+ Imprevistos I (${p.aiu.contingencyPct}%)`,
+          '',
+          '',
+          '',
+          r(t.aiu.contingency),
+          pct(t.aiu.contingency),
+        ],
+        [`+ Utilidad U (${p.aiu.profitPct}%)`, '', '', '', r(t.aiu.profit), pct(t.aiu.profit)],
+        [
+          `+ IVA sobre la utilidad (${p.aiu.vatOnProfitPct}%)`,
+          '',
+          '',
+          '',
+          r(t.aiu.vatOnProfit),
+          pct(t.aiu.vatOnProfit),
+        ],
+      );
+    }
   } else {
-    summary.push([`+ IVA (${p.vatPct}%)`, '', '', '', r(t.vat), pct(t.vat)]);
+    summary.push(
+      [`6. Pólizas (${p.policiesPct}% sobre costo directo)`, '', '', '', r(t.policies), pct(t.policies)],
+      [`7. Impuestos (${p.taxesPct}% sobre costo directo)`, '', '', '', r(t.taxes), pct(t.taxes)],
+      [
+        `8. Financiamiento (${p.financingPct}% sobre costo directo)`,
+        '',
+        '',
+        '',
+        r(t.financing),
+        pct(t.financing),
+      ],
+      [
+        `9. Imprevistos internos (${p.contingencyPct}%)`,
+        '',
+        '',
+        '',
+        r(t.contingency),
+        pct(t.contingency),
+      ],
+      [`10. Administración interna (${p.adminPct}%)`, '', '', '', r(t.adminCost), pct(t.adminCost)],
+      ['= COSTO TOTAL DEL PROYECTO', '', '', '', r(t.totalCost), pct(t.totalCost)],
+      [
+        `+ UTILIDAD (${p.marginPct}% sobre el precio de venta)`,
+        '',
+        '',
+        '',
+        r(t.profit),
+        pct(t.profit),
+      ],
+      ['= SUBTOTAL (valor de venta)', '', '', '', r(t.subtotal), pct(t.subtotal)],
+      [`+ IVA (${p.vatPct}%)`, '', '', '', r(t.vat), pct(t.vat)],
+    );
   }
-  const grossProfit = t.total - t.directCost;
+  const grossProfit = aiuMode ? t.profit : t.total - t.directCost;
   summary.push(
     [],
     ['TOTAL DE LA OFERTA', '', '', '', r(t.total), '100%'],
@@ -190,26 +218,30 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
     ...header('PERSONAL FIJO DEL PROYECTO (costo interno — no aparece en la oferta)'),
     [
       'Cargo',
+      'Personal',
       'Salario mes',
       'Factor prestacional',
       'Aux. transporte',
       'Valor día',
       'Días trabajados',
-      'Extra/noche',
+      'Extra/noche grupo',
+      'Costo unit.',
       'COSTO TOTAL',
     ],
     ...quote.staff.map((m) => [
       m.role,
+      staffMemberQuantity(m),
       m.monthlySalary,
       m.benefitsFactor,
       m.transportAllowance ? 'Sí' : 'No',
       r(monthlyLoadedCost(m) / 30),
       m.days,
-      r(overtimeCost(m)),
+      r(overtimeCost(m) * staffMemberQuantity(m)),
       r(staffMemberCost(m)),
+      r(staffMemberTotal(m)),
     ]),
     [],
-    ['', '', '', '', '', '', 'SUBTOTAL PERSONAL', r(t.staff)],
+    ['', '', '', '', '', '', '', '', 'SUBTOTAL PERSONAL', r(t.staff)],
   ];
 
   const others: unknown[][] = [
@@ -236,7 +268,7 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
     [4, 44, 6, 7, 8, 16, 8, 10, 7, 7, 16, 14, 15, 17, 16, 17],
     [10, 11, 12, 13, 14, 15],
   );
-  addSheet(wb, 'Personal fijo', staff, [50, 14, 16, 14, 12, 14, 14, 16], [1, 4, 6, 7]);
+  addSheet(wb, 'Personal fijo', staff, [50, 9, 14, 16, 14, 12, 14, 16, 14, 16], [2, 5, 7, 8, 9]);
   addSheet(wb, 'Otros costos', others, [16, 44, 12, 16, 16], [3, 4]);
 
   const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;

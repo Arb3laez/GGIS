@@ -57,43 +57,132 @@ export interface AiuSuggestion {
   profitPct: number;
 }
 
-/** AIU sugerido con los rangos usuales en Colombia: A 8–15%, I 1–8%, U 3–8%. */
+const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
+
+/**
+ * AIU recomendado para una licitación: parte de la base sana 10/4/4 y ajusta por tamaño,
+ * solución, complejidad, tipo de servicio, mano de obra, importados y forma de pago.
+ * Los porcentajes se aplican sobre el costo directo.
+ */
 export function suggestAiu(draft: QuoteDraft, totals: QuoteTotals): Suggestion<AiuSuggestion> {
   const cost = totals.directCost;
-  const reasons: string[] = [];
-  let A = 8;
+  const reasons: string[] = ['base sana de licitación: A 10% · I 4% · U 4%'];
+  let A = 10;
   let I = 4;
-  let U: number;
+  let U = 4;
+
   if (cost < 30_000_000) {
-    U = 8;
-    reasons.push('proyecto pequeño: los costos fijos pesan más → utilidad en el tope (8%)');
+    A += 2;
+    U += 2;
+    reasons.push('proyecto pequeño (<$30M): los costos fijos pesan más → +2 A y +2 U');
   } else if (cost <= 150_000_000) {
-    U = 6;
-    reasons.push('proyecto mediano: utilidad intermedia (6%)');
+    A += 1;
+    U += 1;
+    reasons.push('proyecto mediano ($30M–$150M): +1 A y +1 U');
   } else {
-    U = 4;
-    reasons.push('proyecto grande: se compite por precio → utilidad menor (4%)');
+    A -= 1;
+    U -= 1;
+    reasons.push('proyecto grande (>$150M): se compite por precio → −1 A y −1 U');
   }
-  if (draft.solution === 'fire_suppression') {
-    I = 6;
-    A = 10;
-    reasons.push('extinción de incendios: obra civil y tubería → imprevistos 6% y administración 10%');
-  } else if (draft.solution === 'fire_detection') {
-    I = 5;
-    reasons.push('detección de incendios: normativa NFPA → imprevistos 5%');
+
+  switch (draft.solution) {
+    case 'fire_suppression':
+      A += 2;
+      I += 2;
+      reasons.push('extinción de incendios: obra civil, tubería y pruebas hidráulicas → +2 A y +2 I');
+      break;
+    case 'fire_detection':
+      A += 1;
+      I += 1;
+      reasons.push('detección de incendios: normativa NFPA y certificaciones → +1 A y +1 I');
+      break;
+    case 'access_control':
+      I += 1;
+      reasons.push('control de acceso: integración y coordinación con obra → +1 I');
+      break;
+    case 'anti_theft':
+      A -= 1;
+      reasons.push('antihurto: instalación estándar y bajo riesgo → −1 A');
+      break;
+    case 'solt':
+      A -= 1;
+      reasons.push('SOLT: instalación repetitiva y bajo riesgo → −1 A');
+      break;
+    default:
+      break;
   }
+
+  switch (draft.serviceType) {
+    case 'supply_install':
+      A += 1;
+      I += 1;
+      reasons.push('suministro + instalación: supervisión de montaje → +1 A y +1 I');
+      break;
+    case 'preventive':
+      A -= 1;
+      I += 1;
+      reasons.push('mantenimiento preventivo: menos administración pero visitas programadas → −1 A y +1 I');
+      break;
+    case 'corrective':
+      A -= 1;
+      I += 2;
+      reasons.push('mantenimiento correctivo: diagnóstico incierto y atención urgente → −1 A y +2 I');
+      break;
+    case 'supply_only':
+      A -= 2;
+      U -= 1;
+      reasons.push('solo suministro: sin operación en obra → −2 A y −1 U');
+      break;
+    default:
+      break;
+  }
+
+  if (draft.complexity === 'high') {
+    A += 2;
+    I += 2;
+    reasons.push('complejidad alta: más coordinación y riesgo → +2 A y +2 I');
+  } else if (draft.complexity === 'low') {
+    A -= 1;
+    I -= 1;
+    reasons.push('complejidad baja: instalación estándar → −1 A y −1 I');
+  }
+
+  const labor = totals.itemLabor + totals.laborActivities + totals.staff;
+  const laborShare = cost > 0 ? labor / cost : 0;
+  if (laborShare > 0.4) {
+    A += 1;
+    I += 1;
+    reasons.push('mano de obra >40% del costo: más supervisión y variabilidad → +1 A y +1 I');
+  } else if (laborShare < 0.15) {
+    A -= 1;
+    reasons.push('mano de obra <15% del costo: proyecto principalmente de suministro → −1 A');
+  }
+
   if (hasImportedItems(draft)) {
     I += 1;
-    reasons.push('+1 en imprevistos por equipos importados (riesgo de TRM)');
+    reasons.push('equipos importados: riesgo de TRM y disponibilidad → +1 I');
   }
-  return {
-    value: {
-      adminPct: Math.max(8, Math.min(15, A)),
-      contingencyPct: Math.max(1, Math.min(8, I)),
-      profitPct: Math.max(3, Math.min(8, U)),
-    },
-    reasons,
+
+  const t = draft.terms;
+  if (t.financingDays > 30 || t.advancePct < 30) {
+    A += 1;
+    I += 1;
+    reasons.push('pago con financiación o anticipo bajo: más costo financiero → +1 A y +1 I');
+  } else if (t.advancePct >= 50) {
+    A -= 1;
+    reasons.push('anticipo ≥50%: menor necesidad de financiación → −1 A');
+  }
+
+  const value: AiuSuggestion = {
+    adminPct: clamp(A, 8, 15),
+    contingencyPct: clamp(I, 1, 8),
+    profitPct: clamp(U, 3, 8),
   };
+  const total = value.adminPct + value.contingencyPct + value.profitPct;
+  reasons.push(
+    `AIU total ${total.toFixed(0)}% — rango sano 15%–30% para AIU sobre costo directo.`,
+  );
+  return { value, reasons };
 }
 
 export interface NegotiationFloor {
@@ -158,7 +247,10 @@ export function quoteWarnings(draft: QuoteDraft, breakdown: QuoteBreakdown): Quo
     out.push({
       code: 'labor-assigned',
       level: 'ok',
-      message: `${formatCop(breakdown.assignableLabor)} de mano de obra cargada a ${breakdown.itemsCarryingLabor} ítem(s) · margen objetivo ${draft.pricing.marginPct}% sobre la venta.`,
+      message:
+        draft.pricing.method === 'aiu'
+          ? `${formatCop(breakdown.assignableLabor)} de mano de obra cargada a ${breakdown.itemsCarryingLabor} ítem(s) · en AIU la base es el costo directo.`
+          : `${formatCop(breakdown.assignableLabor)} de mano de obra cargada a ${breakdown.itemsCarryingLabor} ítem(s) · margen objetivo ${draft.pricing.marginPct}% sobre la venta.`,
     });
   }
 
@@ -181,7 +273,7 @@ export function quoteWarnings(draft: QuoteDraft, breakdown: QuoteBreakdown): Quo
     });
   }
 
-  if (t.financingDays > 0 && totals.subtotal > 0) {
+  if (draft.pricing.method !== 'aiu' && t.financingDays > 0 && totals.subtotal > 0) {
     const monthlyRate = (totals.financing / totals.subtotal / (t.financingDays / 30)) * 100;
     const ok = monthlyRate >= THRESHOLDS.minMonthlyFinancingRatePct;
     out.push({
@@ -198,11 +290,33 @@ export function quoteWarnings(draft: QuoteDraft, breakdown: QuoteBreakdown): Quo
   if (draft.pricing.method === 'aiu') {
     const a = draft.pricing.aiu;
     const aiuTotal = a.adminPct + a.contingencyPct + a.profitPct;
+    const inRange = aiuTotal >= THRESHOLDS.lowAiuTotalPct && aiuTotal <= 30;
     out.push({
       code: 'aiu-total',
-      level: aiuTotal < THRESHOLDS.lowAiuTotalPct ? 'warning' : 'info',
-      message: `AIU total: ${aiuTotal.toFixed(1)}% — rango habitual en Colombia: 25%–35% en obra, menos en suministro.`,
+      level: inRange ? 'info' : 'warning',
+      message: `AIU total ${aiuTotal.toFixed(1)}% sobre el costo directo — rango sano 15%–30%.`,
     });
+    if (a.adminPct < 5 || a.adminPct > 20) {
+      out.push({
+        code: 'aiu-admin',
+        level: 'warning',
+        message: `Administración A ${a.adminPct}% fuera del rango habitual 5%–20%.`,
+      });
+    }
+    if (a.contingencyPct < 1 || a.contingencyPct > 10) {
+      out.push({
+        code: 'aiu-contingency',
+        level: 'warning',
+        message: `Imprevistos I ${a.contingencyPct}% fuera del rango habitual 1%–10%.`,
+      });
+    }
+    if (a.profitPct < 3 || a.profitPct > 15) {
+      out.push({
+        code: 'aiu-profit',
+        level: 'warning',
+        message: `Utilidad U ${a.profitPct}% fuera del rango habitual 3%–15%.`,
+      });
+    }
   }
   return out;
 }

@@ -4,6 +4,7 @@ import {
   BUSINESS_UNIT_LABELS,
   computeQuote,
   formatCop,
+  PAYMENT_MODE_LABELS,
   safeFileName,
   type CompanyProfile,
   type Quote,
@@ -12,7 +13,20 @@ import { downloadFrom, saveBlob } from '../../api/http';
 import { useCompanyProfile, useQuote } from '../../api/queries';
 import { ArrowLeft, Copy, Download, FolderSync, Mail, Printer } from 'lucide-react';
 import { errorMessage, useToast } from '../../shared/feedback';
-import { OfferDocument, paymentText } from './OfferDocument';
+import { ProposalDocument } from './ProposalDocument';
+import proposalCss from './proposal.css?raw';
+
+/** Texto de la condición de pago, con los días de financiación cuando aplican. */
+function paymentText(q: Quote): string {
+  const days = q.terms.financingDays;
+  let text = PAYMENT_MODE_LABELS[q.terms.paymentMode];
+  if (days > 0) {
+    text = text.includes('X días')
+      ? text.replace('X días', `${days} días`)
+      : `${text} — saldo a ${days} días`;
+  }
+  return text;
+}
 
 /** Convierte las imágenes del documento a data URL para que el HTML descargado sea autónomo. */
 async function inlineImages(root: HTMLElement): Promise<string> {
@@ -42,7 +56,7 @@ function emailDraft(q: Quote, company: CompanyProfile) {
   const body = [
     q.client.contact ? `Estimado(a) ${q.client.contact},` : 'Cordial saludo,',
     '',
-    `Adjunto encontrará la oferta comercial ${q.number} correspondiente a: ${q.client.project || 'el proyecto solicitado'}.`,
+    `Adjunto encontrará la propuesta comercial ${q.number} correspondiente a: ${q.client.project || 'el proyecto solicitado'}.`,
     '',
     `Valor total de la oferta: ${formatCop(t.total)}`,
     `Validez: ${q.validDays} días a partir de la fecha de emisión.`,
@@ -65,7 +79,7 @@ function emailDraft(q: Quote, company: CompanyProfile) {
     .join('\n');
   return {
     to: q.client.email,
-    subject: `Oferta comercial ${q.number} — ${q.client.project} — ${company.tradeName}`,
+    subject: `Propuesta comercial ${q.number} — ${q.client.project} — ${company.tradeName}`,
     body,
   };
 }
@@ -82,7 +96,40 @@ export function OfferPage() {
   if (error) return <div className="alert danger">{errorMessage(error)}</div>;
   if (!quote || !company) return <div className="empty">Cargando oferta…</div>;
 
-  const baseName = `Oferta ${quote.number} - ${safeFileName(quote.client.name)}`;
+  const baseName = `Propuesta ${quote.number} - ${safeFileName(quote.client.name)}`;
+
+  /**
+   * Imprime únicamente el documento de la propuesta en una ventana limpia.
+   * Evita que el shell de la app agregue una página en blanco al final.
+   */
+  function printProposal() {
+    if (!docRef.current) return;
+    const proposal = docRef.current.querySelector('.proposal-doc');
+    if (!proposal) return;
+    const clone = proposal.cloneNode(true) as HTMLElement;
+    clone.querySelector('style')?.remove();
+    const win = window.open('', '_blank', 'width=900,height=1000');
+    if (!win) {
+      notify('Permite ventanas emergentes para imprimir la propuesta.', true);
+      return;
+    }
+    win.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8">
+<title>${baseName.replace(/</g, '')}</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap" rel="stylesheet">
+<style>${proposalCss}</style>
+<style>@page{size:A4;margin:0}html,body{margin:0;background:#fff}.proposal-doc{padding:0;background:#fff}</style>
+</head><body>${clone.outerHTML}</body></html>`);
+    win.document.close();
+    let printed = false;
+    const trigger = () => {
+      if (printed) return;
+      printed = true;
+      win.focus();
+      win.print();
+    };
+    win.setTimeout(trigger, 1200);
+    win.onload = () => win.setTimeout(trigger, 300);
+  }
 
   async function downloadHtml() {
     if (!docRef.current) return;
@@ -112,7 +159,7 @@ export function OfferPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+    <div className="offer-page" style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div className="editor-head no-print">
         <div>
           <Link
@@ -122,7 +169,7 @@ export function OfferPage() {
           >
             <ArrowLeft size={14} /> Volver a editar {quote.number}
           </Link>
-          <h1>Oferta para el cliente</h1>
+          <h1>Propuesta comercial</h1>
         </div>
         <div className="toolbar">
           <button type="button" onClick={() => setEmail(emailDraft(quote, company))}>
@@ -137,8 +184,8 @@ export function OfferPage() {
           <button
             type="button"
             className="primary"
-            onClick={() => window.print()}
-            title="En el diálogo elige 'Guardar como PDF'"
+            onClick={printProposal}
+            title="Se abre una ventana solo con la propuesta; elige 'Guardar como PDF'"
           >
             <Printer size={16} /> Imprimir / PDF
           </button>
@@ -214,7 +261,7 @@ export function OfferPage() {
       ) : null}
 
       <div ref={docRef} className="offer-frame">
-        <OfferDocument quote={quote} company={company} />
+        <ProposalDocument quote={quote} company={company} />
       </div>
     </div>
   );
