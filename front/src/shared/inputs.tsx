@@ -1,8 +1,16 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
+/** Pesos con punto de miles (admite decimales): $16.000 · $12,5. */
+export const formatPesos = (n: number) => `$${n.toLocaleString('es-CO', { maximumFractionDigits: 2 })}`;
+
+/** Precio en la moneda del ítem: $16.000 · US$ 650. */
+export const formatPrice = (n: number, currency: 'COP' | 'USD') =>
+  currency === 'USD' ? `US$ ${n.toLocaleString('es-CO', { maximumFractionDigits: 2 })}` : formatPesos(n);
+
 /**
  * Entrada numérica controlada que permite escribir libremente ("1.", "", "0,5") y solo envía el
- * número cuando es válido. Acepta coma decimal.
+ * número cuando es válido. Acepta coma decimal. Con `format`, fuera de foco muestra el valor
+ * formateado (p. ej. "$3.238.113") y al enfocarlo vuelve al número limpio para editarlo.
  */
 export function NumberInput({
   value,
@@ -13,6 +21,7 @@ export function NumberInput({
   placeholder,
   ariaLabel,
   allowNull = false,
+  format,
 }: {
   value: number | null;
   onChange: (n: number | null) => void;
@@ -22,12 +31,16 @@ export function NumberInput({
   placeholder?: string;
   ariaLabel?: string;
   allowNull?: boolean;
+  format?: (n: number) => string;
 }) {
-  const [text, setText] = useState(value === null ? '' : String(value));
+  const shown = (v: number | null) => (v === null ? '' : format ? format(v) : String(v));
+  const [text, setText] = useState(() => shown(value));
   const focused = useRef(false);
 
   useEffect(() => {
-    if (!focused.current) setText(value === null ? '' : String(value));
+    if (!focused.current) setText(shown(value));
+    // `format` puede ser una función nueva en cada render; basta con reaccionar al valor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
   return (
@@ -39,10 +52,13 @@ export function NumberInput({
       step={step}
       placeholder={placeholder}
       aria-label={ariaLabel}
-      onFocus={() => (focused.current = true)}
+      onFocus={() => {
+        focused.current = true;
+        if (format) setText(value === null ? '' : String(value));
+      }}
       onBlur={() => {
         focused.current = false;
-        setText(value === null ? '' : String(value));
+        setText(shown(value));
       }}
       onChange={(e) => {
         const raw = e.target.value;
@@ -81,7 +97,7 @@ export function TextField({
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
-  type?: 'text' | 'email' | 'date';
+  type?: 'text' | 'email' | 'date' | 'tel';
   hint?: ReactNode;
 }) {
   return (
@@ -97,16 +113,19 @@ export function NumberField({
   onChange,
   hint,
   step,
+  format,
 }: {
   label: string;
   value: number;
   onChange: (n: number) => void;
   hint?: ReactNode;
   step?: number;
+  /** Formato a mostrar fuera de foco (p. ej. pesos). */
+  format?: (n: number) => string;
 }) {
   return (
     <Field label={label} hint={hint}>
-      <NumberInput className="" value={value} step={step} onChange={(n) => onChange(n ?? 0)} />
+      <NumberInput className="" value={value} step={step} format={format} onChange={(n) => onChange(n ?? 0)} />
     </Field>
   );
 }

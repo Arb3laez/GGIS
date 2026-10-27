@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
+  hasAudit,
   LABOR_ACTIVITY_PRESETS,
   OTHER_COST_PRESETS,
   QUOTE_STATUS_LABELS,
@@ -16,6 +17,7 @@ import { SummaryAside } from './SummaryAside';
 import { useScrollSpy } from './useScrollSpy';
 import { AttachmentsSection } from './sections/AttachmentsSection';
 import { ClientSection } from './sections/ClientSection';
+import { ResearchSection } from './sections/ResearchSection';
 import { ClosureSection } from './sections/ClosureSection';
 import { CostLinesSection } from './sections/CostLinesSection';
 import { ItemsSection } from './sections/ItemsSection';
@@ -40,13 +42,14 @@ function draftSummary(client: string, project: string, savedAt: string) {
 const SECTIONS = [
   { id: 'solucion', label: 'Solución' },
   { id: 'cliente', label: 'Cliente' },
+  { id: 'investigacion', label: 'Investigación' },
   { id: 'items', label: 'Ítems' },
   { id: 'personal', label: 'Personal' },
   { id: 'actividades', label: 'M.O. por actividad' },
   { id: 'otros', label: 'Otros costos' },
   { id: 'condiciones', label: 'Condiciones' },
   { id: 'precio', label: 'Precio' },
-  { id: 'cierre', label: 'Cierre real' },
+  { id: 'cierre', label: 'Auditoría' },
 ];
 
 export function QuoteEditorPage() {
@@ -57,12 +60,9 @@ export function QuoteEditorPage() {
   const { quoteId, number, draft, dirty, load, reset, edit } = useEditor();
   const { save, saving } = useSaveQuote();
   const confirm = useConfirm();
-  const navItems = SECTIONS.filter((x) => x.id !== 'cierre' || draft.status === 'won');
+  const navItems = SECTIONS.filter((x) => x.id !== 'cierre' || hasAudit(draft.status));
   const active = useScrollSpy(navItems.map((x) => x.id));
   const loadedKey = useRef<string | null>(null);
-  const [itemsWide, setItemsWide] = useState(
-    () => new URLSearchParams(window.location.search).get('wide') === '1',
-  );
 
   // Cargar la cotización del servidor (o empezar una nueva).
   useEffect(() => {
@@ -139,6 +139,10 @@ export function QuoteEditorPage() {
   const statusStyle = STATUS_STYLE[draft.status];
 
   async function goToOffer() {
+    if (useEditor.getState().researchBusy) {
+      notify('Espera a que terminen las fotos e imágenes de la investigación.', true);
+      return;
+    }
     const savedId = dirty || !quoteId ? await save() : quoteId;
     if (savedId) navigate(`/quotes/${savedId}/offer`);
   }
@@ -268,12 +272,16 @@ export function QuoteEditorPage() {
         ))}
       </nav>
 
-      <div className={`editor-layout${itemsWide ? ' items-wide' : ''}`}>
+      {/* Solución, cliente e ítems usan todo el ancho para que la tabla de ítems quepa sin
+          desplazarse; el resumen acompaña desde el personal hasta el precio final. */}
+      <SolutionPicker />
+      <ClientSection />
+      <ResearchSection />
+      <ItemsSection />
+      <AttachmentsSection />
+
+      <div className="editor-layout">
         <div>
-          <SolutionPicker />
-          <ClientSection />
-          <ItemsSection expanded={itemsWide} onToggleExpand={() => setItemsWide((v) => !v)} />
-          <AttachmentsSection />
           <StaffSection />
           <CostLinesSection
             id="actividades"
@@ -297,10 +305,12 @@ export function QuoteEditorPage() {
           />
           <TermsSection />
           <PricingSection />
-          {draft.status === 'won' ? <ClosureSection /> : null}
         </div>
         <SummaryAside />
       </div>
+
+      {/* La auditoría del cierre usa todo el ancho: sus tablas comparan muchas columnas. */}
+      {hasAudit(draft.status) ? <ClosureSection /> : null}
     </>
   );
 }

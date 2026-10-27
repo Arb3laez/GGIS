@@ -3,6 +3,7 @@ import {
   actualCost,
   computeQuote,
   duplicateDraft,
+  todayIso,
   type Quote,
   type QuoteDraft,
   type QuoteSummary,
@@ -53,7 +54,7 @@ export class QuotesService {
         version: 1,
         createdAt: ts,
         updatedAt: ts,
-        draft: normalize(draft),
+        draft: stampStage(normalize(draft), null, this.now()),
       };
       this.repo.insert(record, summarize(record));
       return toQuote(record);
@@ -77,7 +78,7 @@ export class QuotesService {
       ...current,
       version: current.version + 1,
       updatedAt: this.now().toISOString(),
-      draft: normalize(draft),
+      draft: stampStage(normalize(draft), current.draft, this.now()),
     };
     if (!this.repo.update(record, summarize(record), expectedVersion)) {
       throw conflict('La cotización cambió mientras se guardaba. Recárgala e intenta de nuevo.');
@@ -95,6 +96,7 @@ export class QuotesService {
         ...draft,
         status: change.status,
         lossReason: change.status === 'lost' ? (change.lossReason ?? draft.lossReason) : null,
+        stage: change.stage === undefined ? draft.stage : change.stage,
       },
       version,
     );
@@ -147,8 +149,8 @@ export class QuotesService {
   }
 
   /**
-   * Recalcula los totales del listado con el motor actual. Se ejecuta al arrancar, así un cambio en
-   * las fórmulas (p. ej. el redondeo de facturación) se refleja en el listado sin volver a guardar
+   * Recalcula el resumen del listado con el motor actual. Se ejecuta al arrancar, así un cambio en
+   * las fórmulas o una columna nueva del listado (contacto, etapa) se refleja sin volver a guardar
    * cada cotización. Devuelve cuántas cambiaron.
    */
   refreshSummaries(): number {
@@ -163,7 +165,8 @@ export class QuotesService {
         if (
           !prev ||
           Math.round(prev.total) !== Math.round(next.total) ||
-          Math.round(prev.budgetedCost) !== Math.round(next.budgetedCost)
+          Math.round(prev.budgetedCost) !== Math.round(next.budgetedCost) ||
+          listFields(prev) !== listFields(next)
         ) {
           this.repo.updateSummary(id, next);
           changed++;
@@ -177,6 +180,21 @@ export class QuotesService {
   exportAll(): Quote[] {
     return this.repo.listAllIds().map((id) => this.get(id));
   }
+}
+
+/** Campos del listado que no son montos: si cambian, se reescribe el resumen al arrancar. */
+function listFields(s: QuoteSummary): string {
+  const { total: _t, budgetedCost: _b, actualCost: _a, actualSale: _s, updatedAt: _u, ...rest } = s;
+  return JSON.stringify(rest);
+}
+
+/** La fecha de la etapa la pone el servidor: cambia solo cuando cambia la etapa. */
+function stampStage(draft: QuoteDraft, previous: QuoteDraft | null, now: Date): QuoteDraft {
+  if (!draft.stage) return { ...draft, stageUpdatedOn: null };
+  if (previous && previous.stage === draft.stage) {
+    return { ...draft, stageUpdatedOn: previous.stageUpdatedOn ?? draft.stageUpdatedOn };
+  }
+  return { ...draft, stageUpdatedOn: todayIso(now) };
 }
 
 /** Reglas de consistencia que no dependen de la interfaz. */
@@ -194,6 +212,15 @@ function summarize(r: QuoteRecord): QuoteSummary {
     number: r.number,
     clientName: r.draft.client.name,
     projectName: r.draft.client.project,
+    contactName: r.draft.client.contact,
+    contactPhone: r.draft.client.phone,
+    contactPhone2: r.draft.client.phone2,
+    identification: r.draft.client.identification,
+    transactionType: r.draft.transactionType,
+    temperature: r.draft.followUp.temperature,
+    sendStatus: r.draft.followUp.sendStatus,
+    closeDate: r.draft.followUp.closeDate,
+    note: r.draft.followUp.note,
     issueDate: r.draft.issueDate,
     validDays: r.draft.validDays,
     status: r.draft.status,
@@ -201,9 +228,11 @@ function summarize(r: QuoteRecord): QuoteSummary {
     serviceType: r.draft.serviceType,
     lossReason: r.draft.lossReason,
     nextFollowUp: r.draft.nextFollowUp,
+    stage: r.draft.stage,
+    stageUpdatedOn: r.draft.stageUpdatedOn,
     total: totals.total,
     budgetedCost: totals.totalCost,
-    actualCost: actualCost(r.draft.closure),
+    actualCost: actualCost(r.draft),
     actualSale: r.draft.closure.actualSale ?? 0,
     closedOn: r.draft.closure.closedOn,
     updatedAt: r.updatedAt,

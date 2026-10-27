@@ -7,7 +7,7 @@ import {
   type QuoteDraft,
 } from '@ggis/domain';
 import type { ReactNode } from 'react';
-import { NumberInput } from '../../../shared/inputs';
+import { formatPesos, NumberInput } from '../../../shared/inputs';
 import { SectionTitle } from '../../../shared/SectionTitle';
 import { useDraft, useEdit } from '../store';
 
@@ -79,6 +79,7 @@ export function CostLinesSection({
                 <NumberInput
                   value={l.unitPrice}
                   ariaLabel="Valor unitario"
+                  format={formatPesos}
                   onChange={(n) => editLine(l.id, (x) => void (x.unitPrice = n ?? 0))}
                 />
               </td>

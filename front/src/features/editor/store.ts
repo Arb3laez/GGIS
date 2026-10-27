@@ -27,6 +27,9 @@ interface EditorState {
   /** Aplica cambios al borrador (con immer: se puede "mutar" el draft). */
   edit: (recipe: (d: QuoteDraft) => void) => void;
   markSaved: (q: Quote) => void;
+  /** true mientras la investigación trae fotos, mapa o genera imágenes (no se debe salir aún). */
+  researchBusy: boolean;
+  setResearchBusy: (busy: boolean) => void;
 }
 
 export function quoteToDraft(q: Quote): QuoteDraft {
@@ -41,6 +44,11 @@ export const useEditor = create<EditorState>()(
     version: null,
     draft: createEmptyDraft(),
     dirty: false,
+    researchBusy: false,
+    setResearchBusy: (busy) =>
+      set((s) => {
+        s.researchBusy = busy;
+      }),
     load: (q) =>
       set((s) => {
         s.quoteId = q.id;

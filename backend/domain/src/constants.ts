@@ -24,6 +24,10 @@ export const QUOTE_STATUS_LABELS: Record<QuoteStatus, string> = {
   replaced: 'Sustituida',
 };
 
+/** Estados con auditoría (comparativo de lo cotizado contra lo pagado): En negociación y Adjudicada. */
+export const AUDIT_STATUSES: ReadonlyArray<QuoteStatus> = ['negotiating', 'won'];
+export const hasAudit = (status: QuoteStatus) => AUDIT_STATUSES.includes(status);
+
 export const BUSINESS_UNITS = ['cctv', 'fire', 'access_control', 'anti_theft', 'solt'] as const;
 export type BusinessUnit = (typeof BUSINESS_UNITS)[number];
 export const BUSINESS_UNIT_LABELS: Record<BusinessUnit, string> = {
@@ -32,6 +36,83 @@ export const BUSINESS_UNIT_LABELS: Record<BusinessUnit, string> = {
   access_control: 'Control acceso',
   anti_theft: 'Antihurto',
   solt: 'SOLT',
+};
+
+/**
+ * Nivel de oferta (etapa del seguimiento comercial) con su probabilidad de cierre: la
+ * parametrización del Excel "CRM Ventas". Repetido y Reemplazado no tienen porcentaje.
+ */
+export const FOLLOW_UP_STAGES = [
+  { value: 'vendido', label: 'Vendido', pct: 100 },
+  { value: 'cierre-mes', label: 'Cierre este mes', pct: 80 },
+  { value: 'cierre-otro', label: 'Cierre otro mes', pct: 60 },
+  { value: 'sin-avance', label: 'Sin avance', pct: 40 },
+  { value: 'buscando', label: 'Buscando contacto', pct: 10 },
+  { value: 'descartado', label: 'Descartado', pct: 0 },
+  { value: 'repetido', label: 'Repetido', pct: null },
+  { value: 'reemplazado', label: 'Reemplazado', pct: null },
+] as const satisfies ReadonlyArray<{ value: string; label: string; pct: number | null }>;
+export type FollowUpStage = (typeof FOLLOW_UP_STAGES)[number]['value'];
+
+/** Etapa del catálogo (o undefined si es un texto que no está en la parametrización). */
+export function findStage(value: string | null | undefined) {
+  return FOLLOW_UP_STAGES.find((s) => s.value === value);
+}
+
+/** Temperatura del cliente frente a la oferta. */
+export const TEMPERATURES = ['caliente', 'tibio', 'vendido', 'descartado', 'reemplazado'] as const;
+export type Temperature = (typeof TEMPERATURES)[number];
+export const TEMPERATURE_LABELS: Record<Temperature, string> = {
+  caliente: 'Caliente',
+  tibio: 'Tibio',
+  vendido: 'Vendido',
+  descartado: 'Descartado',
+  reemplazado: 'Reemplazado',
+};
+
+/** Estado del envío de la oferta al cliente. */
+export const SEND_STATUSES = ['unsent', 'sent', 'outlook', 'read'] as const;
+export type SendStatus = (typeof SEND_STATUSES)[number];
+export const SEND_STATUS_LABELS: Record<SendStatus, string> = {
+  unsent: 'No enviada',
+  sent: 'Enviada',
+  outlook: 'Enviada por Outlook',
+  read: 'Leída',
+};
+
+/** Tipo de transacción (como en SIIGO). */
+export const TRANSACTION_TYPES = ['quote', 'work_order'] as const;
+export type TransactionType = (typeof TRANSACTION_TYPES)[number];
+export const TRANSACTION_TYPE_LABELS: Record<TransactionType, string> = {
+  quote: 'Cotización',
+  work_order: 'Orden de trabajo',
+};
+
+/** Tipo de instalación del cliente (elige la imagen alusiva de la biblioteca G&G). */
+export const FACILITY_KINDS = [
+  'warehouse',
+  'retail',
+  'hotel',
+  'industrial',
+  'office',
+  'education',
+  'health',
+  'residential',
+  'fuel',
+  'other',
+] as const;
+export type FacilityKind = (typeof FACILITY_KINDS)[number];
+export const FACILITY_KIND_LABELS: Record<FacilityKind, string> = {
+  warehouse: 'Bodega / centro logístico',
+  retail: 'Tienda / comercio',
+  hotel: 'Hotel',
+  industrial: 'Planta industrial',
+  office: 'Oficinas',
+  education: 'Colegio / universidad',
+  health: 'Clínica / hospital',
+  residential: 'Conjunto residencial',
+  fuel: 'Estación de servicio',
+  other: 'Otro',
 };
 
 /** Tipo de servicio de la cotización, independiente de la unidad de negocio. */

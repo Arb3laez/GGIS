@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  ClientResearch,
+  ClientResearchRequest,
+  ResearchImageRequest,
   AttachmentMeta,
   BackupImportResult,
   BusinessUnit,
@@ -13,6 +16,7 @@ import type {
   QuoteDraft,
   QuoteStatus,
   QuoteSummary,
+  ServiceType,
   StatusChange,
 } from '@ggis/domain';
 import { http } from './http';
@@ -34,6 +38,7 @@ export const keys = {
 export interface QuoteFilter {
   status?: QuoteStatus;
   businessUnit?: BusinessUnit;
+  serviceType?: ServiceType;
   q?: string;
 }
 
@@ -55,6 +60,7 @@ export function useQuote(id: string | undefined) {
 }
 
 export const quotesApi = {
+  get: (id: string) => http.get<Quote>(`/api/quotes/${id}`),
   create: (draft: QuoteDraft) => http.post<Quote>('/api/quotes', draft),
   update: (id: string, version: number, draft: QuoteDraft) =>
     http.put<Quote>(`/api/quotes/${id}`, { version, quote: draft }),
@@ -129,6 +135,23 @@ export function useImportCapabilities() {
     queryFn: () => http.get<{ ai: boolean }>('/api/imports/capabilities'),
   });
 }
+
+export function useResearchCapabilities() {
+  return useQuery({
+    queryKey: ['research', 'capabilities'],
+    queryFn: () => http.get<{ enabled: boolean; maps: boolean }>('/api/research/capabilities'),
+    staleTime: Infinity,
+  });
+}
+
+export const researchApi = {
+  run: (req: ClientResearchRequest) => http.post<ClientResearch>('/api/research', req),
+  image: (req: ResearchImageRequest) => http.post<AttachmentMeta>('/api/research/images', req),
+  removeImage: (attachmentId: string) => http.delete(`/api/attachments/${attachmentId}`),
+  photos: (req: { quoteId: string; pages: Array<{ url: string; title: string }> }) =>
+    http.post<ClientResearch['photos']>('/api/research/photos', req),
+  map: (req: { quoteId: string; query: string }) => http.post<AttachmentMeta>('/api/research/map', req),
+};
 
 export const importsApi = {
   spreadsheet: (file: File) => http.upload<ImportPreview>('/api/imports/spreadsheet', file),

@@ -1,0 +1,145 @@
+/* =============================================================================
+   Sistema de diseño GYG Innova — tokens generados desde gyg-design-system/tokens.json.
+   Es la única fuente de valores: colores (tema claro y oscuro), tipografía, espaciado,
+   radios y sombras. Tema oscuro con data-theme="dark" en <html>.
+   ============================================================================= */
+:root {
+  --navy-900: #0F2233;
+  --navy-800: #16324A;
+  --navy-700: #1F4263;
+  --navy-500: #4A6580;
+  --steel-400: #6F8CA6;
+  --steel-300: #B6C9DA;
+  --ice-200: #D9E7F3;
+  --ice-100: #EAF2F9;
+  --ice-50: #F4F8FC;
+  --blue-500: #0094F8;
+  --blue-600: #0A6CD0;
+  --blue-700: #0A5399;
+  --white: #FFFFFF;
+  --surface-page: #F8F9FA;
+  --surface-tray: #EEF3F8;
+  --surface-card: #FFFFFF;
+  --surface-card-hover: #F4F8FC;
+  --surface-tint: #D9E7F3;
+  --ink: #0F2233;
+  --ink-muted: #4A6580;
+  --border-subtle: #D9E7F3;
+  --border-control: #6F8CA6;
+  --accent: #0094F8;
+  --action: #0A6CD0;
+  --action-hover: #0A5399;
+  --on-action: #FFFFFF;
+  --focus-ring: #0A6CD0;
+  --status-sent-bg: #DCEEFD;
+  --status-sent-ink: #0A4F8F;
+  --status-negotiation-bg: #1F4263;
+  --status-negotiation-ink: #FFFFFF;
+  --status-won-bg: #DFF3E6;
+  --status-won-ink: #135C37;
+  --status-lost-bg: #FBE4E4;
+  --status-lost-ink: #9A1B1B;
+  --status-replaced-bg: #E6EBF0;
+  --status-replaced-ink: #3F566B;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+  --shadow-card: 0 1px 2px rgba(15,34,51,0.06), 0 4px 12px rgba(15,34,51,0.05);
+  --shadow-card-hover: 0 2px 4px rgba(15,34,51,0.08), 0 10px 24px rgba(15,34,51,0.10);
+  --font-sans: Manrope, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-page: #0A1724;
+  --surface-tray: #0E1F30;
+  --surface-card: #132B40;
+  --surface-card-hover: #183652;
+  --surface-tint: #1D3C58;
+  --ink: #EAF2F9;
+  --ink-muted: #A9BED0;
+  --border-subtle: #25445E;
+  --border-control: #6F8CA6;
+  --accent: #0094F8;
+  --action: #3DB1FF;
+  --action-hover: #6CC4FF;
+  --on-action: #0A1724;
+  --focus-ring: #3DB1FF;
+  --status-sent-bg: #17405F;
+  --status-sent-ink: #BFE3FF;
+  --status-negotiation-bg: #2B5A85;
+  --status-negotiation-ink: #FFFFFF;
+  --status-won-bg: #1B4A32;
+  --status-won-ink: #BDEBD0;
+  --status-lost-bg: #5A2327;
+  --status-lost-ink: #FFC9C9;
+  --status-replaced-bg: #2B3F52;
+  --status-replaced-ink: #C3D2DF;
+  --shadow-card: 0 1px 2px rgba(0,0,0,0.4), 0 4px 12px rgba(0,0,0,0.3);
+  --shadow-card-hover: 0 2px 4px rgba(0,0,0,0.5), 0 10px 24px rgba(0,0,0,0.4);
+}
+
+/* Título del módulo. */
+.page-title {
+  font-family: var(--font-sans);
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+/* Nombre del cliente en la tarjeta. */
+.card-title {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 22px;
+  font-weight: 700;
+}
+/* Descripciones y valores de campos. */
+.body {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 500;
+}
+/* Etiquetas de botones y estados. */
+.body-strong {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+}
+/* Metadatos, subtítulos de etapa. */
+.meta {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+}
+/* Encabezados de columna en mayúsculas. */
+.col-label {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+/* Total de la cotización; use cifras tabulares. */
+.amount {
+  font-family: var(--font-sans);
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { blankItem, blankStaffMember, createEmptyDraft, STAFF_ROLE_PRESETS } from '../factories';
 import type { QuoteDraft } from '../schemas';
-import { computeQuote, priceForTargetMargin } from './engine';
+import { computeQuote, overheadsOn, priceForTargetMargin } from './engine';
 import {
   consolidateStaff,
   overtimeCost,
@@ -80,9 +80,8 @@ function randomDraft(seed: number): QuoteDraft {
   const d = createEmptyDraft(new Date('2026-10-01'));
   d.exchangeRate = 3800 + Math.round(r() * 600);
   d.importCostPct = Math.round(r() * 15);
-  // La paridad con la v68 se conserva para el método simple: el AIU cambió a propósito
-  // a una sola capa sobre el costo directo (ver pruebas de AIU más abajo).
-  d.pricing.method = 'simple';
+  // Paridad con la v68 en los dos métodos (el AIU va encima del subtotal, como en v68).
+  d.pricing.method = r() < 0.5 ? 'simple' : 'aiu';
   d.pricing.marginPct = Math.round(r() * 40);
   d.items = Array.from({ length: 1 + Math.floor(r() * 8) }, (_, i) => ({
     ...blankItem(r() < 0.1 ? '' : `Ítem ${i}`, 'UN'),
@@ -146,6 +145,13 @@ describe('computeQuote — paridad con la v68', () => {
     if (!anyOverride && weighted) {
       const maxRounding = billable.reduce((s, { it }) => s + 0.5 * it.quantity + 0.5, 0);
       expect(Math.abs(mine.totals.subtotal - legacy.totals.subtotal)).toBeLessThanOrEqual(maxRounding);
+      // El total (IVA o AIU + IVA sobre la U) también sigue a la v68, salvo el redondeo al peso.
+      if (legacy.totals.subtotal > 0) {
+        const factor = legacy.totals.total / legacy.totals.subtotal;
+        expect(Math.abs(mine.totals.total - legacy.totals.total)).toBeLessThanOrEqual(
+          maxRounding * factor + 4,
+        );
+      }
     }
   });
 });
@@ -242,42 +248,45 @@ describe('computeQuote — casos calculados a mano', () => {
   });
 });
 
-describe('AIU — una sola capa sobre el costo directo', () => {
-  it('reproduce el AIU del PDF: 10/4/4 y IVA sobre la U exacta', () => {
+describe('AIU — como v68: costos internos y utilidad primero, AIU encima del subtotal', () => {
+  it('el ejemplo de 10.000.000: internos 17%, utilidad 30% y AIU 8/4/4', () => {
     const d = createEmptyDraft();
     d.staff = [];
-    d.items = [
-      { ...blankItem('Sistema', 'UN'), quantity: 1, unitPrice: 31_774_806, laborPct: 0 },
-    ];
+    d.items = [{ ...blankItem('Sistema', 'UN'), quantity: 1, unitPrice: 10_000_000, laborPct: 0 }];
     d.pricing = {
       ...d.pricing,
       method: 'aiu',
       marginPct: 30,
-      policiesPct: 5,
+      policiesPct: 1,
       taxesPct: 7,
       financingPct: 1,
       contingencyPct: 3,
       adminPct: 5,
-      aiu: { adminPct: 10, contingencyPct: 4, profitPct: 4, vatOnProfitPct: 19 },
+      aiu: { adminPct: 8, contingencyPct: 4, profitPct: 4, vatOnProfitPct: 19 },
     };
     const { totals } = computeQuote(d);
 
-    expect(totals.subtotal).toBe(31_774_806);
+    // Los costos internos sí aplican en AIU (igual que en "Subtotal + IVA").
+    expect(totals.policies).toBeCloseTo(100_000, 6);
+    expect(totals.adminCost).toBeCloseTo(500_000, 6);
+    expect(totals.totalCost).toBeCloseTo(11_700_000, 6);
+    expect(totals.subtotal).toBe(Math.round(11_700_000 / 0.7));
+    expect(totals.profit).toBeCloseTo(totals.subtotal - 11_700_000, 6);
+    // A, I y U sobre el subtotal; IVA solo sobre la U.
+    const sub = totals.subtotal;
     expect(totals.aiu).toMatchObject({
-      admin: 3_177_481,
-      contingency: 1_270_992,
-      profit: 1_270_992,
-      vatOnProfit: 241_489,
+      admin: Math.round(sub * 0.08),
+      contingency: Math.round(sub * 0.04),
+      profit: Math.round(sub * 0.04),
+      vatOnProfit: Math.round(sub * 0.04 * 0.19),
     });
-    expect(totals.total).toBe(37_735_760);
-    expect(totals.totalCost).toBe(36_223_279);
-    expect(totals.profit).toBe(1_270_992);
-    // El margen y los costos internos no se aplican en AIU.
-    expect(totals.policies).toBe(0);
-    expect(totals.adminCost).toBe(0);
+    expect(totals.total).toBe(
+      sub + Math.round(sub * 0.08) + 2 * Math.round(sub * 0.04) + Math.round(sub * 0.04 * 0.19),
+    );
+    expect(totals.vat).toBe(0);
   });
 
-  it('en AIU el precio para un margen objetivo deja U/total = margen', () => {
+  it('el precio para un margen objetivo usa la misma base en los dos métodos', () => {
     const d = createEmptyDraft();
     d.pricing = {
       ...d.pricing,
@@ -285,9 +294,9 @@ describe('AIU — una sola capa sobre el costo directo', () => {
       aiu: { adminPct: 10, contingencyPct: 4, profitPct: 4, vatOnProfitPct: 19 },
     };
     const p = priceForTargetMargin(1_000_000, 20, d.pricing);
-    expect(p.subtotal).toBe(1_000_000);
-    expect(p.aiu).not.toBeNull();
-    expect(p.aiu!.profit / p.total).toBeCloseTo(0.2, 6);
+    const base = overheadsOn(1_000_000, d.pricing).total;
+    expect(p.subtotal).toBeCloseTo(base / 0.8, 6);
+    expect(p.aiu!.profit).toBeCloseTo((base / 0.8) * 0.04, 6);
   });
 });
 

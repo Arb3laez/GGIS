@@ -27,7 +27,6 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
   const pct = (part: number) => (t.total > 0 ? `${((part / t.total) * 100).toFixed(1)}%` : '0%');
   const r = Math.round;
   const p = quote.pricing;
-  const aiuMode = p.method === 'aiu';
   const method = PRICING_METHOD_LABELS[p.method];
   const header = (title: string) => [
     [`${company.legalName} · Análisis de costos`],
@@ -64,73 +63,50 @@ export function buildCostAnalysisWorkbook(quote: Quote, company: CompanyProfile)
     ['3. Mano de obra por actividad', '', '', '', r(t.laborActivities), pct(t.laborActivities)],
     ['4. Personal fijo del proyecto', '', '', '', r(t.staff), pct(t.staff)],
     ['5. Otros costos del proyecto', '', '', '', r(t.otherCosts), pct(t.otherCosts)],
-    [
-      aiuMode ? '= SUBTOTAL (costo directo)' : '= COSTO DIRECTO',
-      '',
-      '',
-      '',
-      r(aiuMode ? t.subtotal : t.directCost),
-      pct(aiuMode ? t.subtotal : t.directCost),
-    ],
+    ['= COSTO DIRECTO', '', '', '', r(t.directCost), pct(t.directCost)],
   ];
-  if (aiuMode) {
-    if (t.aiu) {
-      summary.push(
-        [`+ Administración A (${p.aiu.adminPct}%)`, '', '', '', r(t.aiu.admin), pct(t.aiu.admin)],
-        [
-          `+ Imprevistos I (${p.aiu.contingencyPct}%)`,
-          '',
-          '',
-          '',
-          r(t.aiu.contingency),
-          pct(t.aiu.contingency),
-        ],
-        [`+ Utilidad U (${p.aiu.profitPct}%)`, '', '', '', r(t.aiu.profit), pct(t.aiu.profit)],
-        [
-          `+ IVA sobre la utilidad (${p.aiu.vatOnProfitPct}%)`,
-          '',
-          '',
-          '',
-          r(t.aiu.vatOnProfit),
-          pct(t.aiu.vatOnProfit),
-        ],
-      );
-    }
-  } else {
+  summary.push(
+    [`6. Pólizas (${p.policiesPct}% sobre costo directo)`, '', '', '', r(t.policies), pct(t.policies)],
+    [`7. Impuestos (${p.taxesPct}% sobre costo directo)`, '', '', '', r(t.taxes), pct(t.taxes)],
+    [
+      `8. Financiamiento (${p.financingPct}% sobre costo directo)`,
+      '',
+      '',
+      '',
+      r(t.financing),
+      pct(t.financing),
+    ],
+    [`9. Imprevistos internos (${p.contingencyPct}%)`, '', '', '', r(t.contingency), pct(t.contingency)],
+    [`10. Administración interna (${p.adminPct}%)`, '', '', '', r(t.adminCost), pct(t.adminCost)],
+    ['= COSTO TOTAL DEL PROYECTO', '', '', '', r(t.totalCost), pct(t.totalCost)],
+    [`+ UTILIDAD (${p.marginPct}% sobre el precio de venta)`, '', '', '', r(t.profit), pct(t.profit)],
+    ['= SUBTOTAL (valor de venta)', '', '', '', r(t.subtotal), pct(t.subtotal)],
+  );
+  if (t.aiu) {
     summary.push(
-      [`6. Pólizas (${p.policiesPct}% sobre costo directo)`, '', '', '', r(t.policies), pct(t.policies)],
-      [`7. Impuestos (${p.taxesPct}% sobre costo directo)`, '', '', '', r(t.taxes), pct(t.taxes)],
+      [`+ Administración A (${p.aiu.adminPct}%)`, '', '', '', r(t.aiu.admin), pct(t.aiu.admin)],
       [
-        `8. Financiamiento (${p.financingPct}% sobre costo directo)`,
+        `+ Imprevistos I (${p.aiu.contingencyPct}%)`,
         '',
         '',
         '',
-        r(t.financing),
-        pct(t.financing),
+        r(t.aiu.contingency),
+        pct(t.aiu.contingency),
       ],
+      [`+ Utilidad U (${p.aiu.profitPct}%)`, '', '', '', r(t.aiu.profit), pct(t.aiu.profit)],
       [
-        `9. Imprevistos internos (${p.contingencyPct}%)`,
+        `+ IVA sobre la utilidad (${p.aiu.vatOnProfitPct}%)`,
         '',
         '',
         '',
-        r(t.contingency),
-        pct(t.contingency),
+        r(t.aiu.vatOnProfit),
+        pct(t.aiu.vatOnProfit),
       ],
-      [`10. Administración interna (${p.adminPct}%)`, '', '', '', r(t.adminCost), pct(t.adminCost)],
-      ['= COSTO TOTAL DEL PROYECTO', '', '', '', r(t.totalCost), pct(t.totalCost)],
-      [
-        `+ UTILIDAD (${p.marginPct}% sobre el precio de venta)`,
-        '',
-        '',
-        '',
-        r(t.profit),
-        pct(t.profit),
-      ],
-      ['= SUBTOTAL (valor de venta)', '', '', '', r(t.subtotal), pct(t.subtotal)],
-      [`+ IVA (${p.vatPct}%)`, '', '', '', r(t.vat), pct(t.vat)],
     );
+  } else {
+    summary.push([`+ IVA (${p.vatPct}%)`, '', '', '', r(t.vat), pct(t.vat)]);
   }
-  const grossProfit = aiuMode ? t.profit : t.total - t.directCost;
+  const grossProfit = t.total - t.directCost;
   summary.push(
     [],
     ['TOTAL DE LA OFERTA', '', '', '', r(t.total), '100%'],

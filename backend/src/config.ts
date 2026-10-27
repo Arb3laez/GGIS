@@ -23,6 +23,10 @@ const envSchema = z.object({
   WEB_DIST_DIR: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().default('claude-opus-5-5'),
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_MODEL: z.string().default('gpt-5'),
+  OPENAI_IMAGE_MODEL: z.string().default('gpt-image-1.5'),
+  GOOGLE_MAPS_API_KEY: z.string().optional(),
   EXCHANGE_RATE_TTL_MIN: z.coerce.number().min(1).default(60),
   MAX_UPLOAD_MB: z.coerce.number().min(1).max(50).default(10),
 });
@@ -53,6 +57,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
       apiKey: e.ANTHROPIC_API_KEY?.trim() || undefined,
       model: e.ANTHROPIC_MODEL,
     },
+    research: {
+      // Vacío = investigación de clientes con IA deshabilitada (quedan los botones de Google).
+      apiKey: e.OPENAI_API_KEY?.trim() || undefined,
+      model: e.OPENAI_MODEL,
+      imageModel: e.OPENAI_IMAGE_MODEL,
+    },
+    // Vacío = sin mapa de Google en la oferta (queda el enlace a Google Maps).
+    googleMapsKey: e.GOOGLE_MAPS_API_KEY?.trim() || undefined,
     exchangeRateTtlMs: e.EXCHANGE_RATE_TTL_MIN * 60_000,
     maxUploadBytes: e.MAX_UPLOAD_MB * 1024 * 1024,
   };

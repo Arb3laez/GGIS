@@ -6,6 +6,7 @@ import {
   type Solution,
 } from './constants';
 import {
+  followUpSchema,
   type CompanyProfile,
   type CostLine,
   type QuoteDraft,
@@ -121,7 +122,21 @@ export function createEmptyDraft(now: Date = new Date()): QuoteDraft {
     status: 'sent',
     lossReason: null,
     nextFollowUp: null,
-    client: { name: '', project: '', contact: '', email: '', city: 'Barranquilla' },
+    stage: null,
+    stageUpdatedOn: null,
+    transactionType: 'quote',
+    followUp: followUpSchema.parse({}),
+    research: null,
+    client: {
+      name: '',
+      project: '',
+      contact: '',
+      phone: '',
+      phone2: '',
+      identification: '',
+      email: '',
+      city: 'Barranquilla',
+    },
     businessUnit: null,
     serviceType: null,
     complexity: 'medium',
@@ -159,6 +174,7 @@ export function createEmptyDraft(now: Date = new Date()): QuoteDraft {
     closure: {
       categories: DEFAULT_CLOSURE_CATEGORIES.map((c) => ({ ...c })),
       entries: [],
+      lineActuals: {},
       actualSale: null,
       closedOn: null,
       notes: '',
@@ -178,6 +194,9 @@ export function duplicateDraft(source: QuoteDraft, now: Date = new Date()): Quot
     status: 'sent',
     lossReason: null,
     nextFollowUp: null,
+    stage: null,
+    stageUpdatedOn: null,
+    followUp: followUpSchema.parse({}),
     issueDate: todayIso(now),
     closure: empty.closure,
     // Una copia normal no hereda los vínculos de sustitución; los pone el caso de uso "sustituir".

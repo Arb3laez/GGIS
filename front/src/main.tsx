@@ -10,6 +10,15 @@ import { QuotesListPage } from './features/quotes/QuotesListPage';
 import { SettingsPage } from './features/settings/SettingsPage';
 import { ConfirmProvider } from './shared/confirm';
 import { ToastProvider } from './shared/feedback';
+// Manrope servida por la propia app (no desde Google): así el PDF de la oferta la puede incrustar.
+import '@fontsource/manrope/latin-300.css';
+import '@fontsource/manrope/latin-400.css';
+import '@fontsource/manrope/latin-500.css';
+import '@fontsource/manrope/latin-600.css';
+import '@fontsource/manrope/latin-700.css';
+import '@fontsource/manrope/latin-800.css';
+import './styles/tokens.css';
+import './styles/gyg.css';
 import './styles/global.css';
 
 const queryClient = new QueryClient({

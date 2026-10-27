@@ -40,9 +40,14 @@ export class AttachmentsService {
     ).map(toMeta);
   }
 
-  add(quoteId: string, fileName: string, data: Buffer): AttachmentMeta {
+  /** Falla si la cotización no existe (o está eliminada). */
+  assertQuote(quoteId: string): void {
     const quote = this.db.prepare('SELECT 1 FROM quotes WHERE id = ? AND deleted_at IS NULL').get(quoteId);
     if (!quote) throw notFound('La cotización');
+  }
+
+  add(quoteId: string, fileName: string, data: Buffer): AttachmentMeta {
+    this.assertQuote(quoteId);
     const mime = sniffDocumentType(data);
     if (!mime) throw badRequest('Solo se aceptan PDF o imágenes (PNG, JPG, WEBP).');
     const id = randomUUID();

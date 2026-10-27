@@ -1,13 +1,18 @@
 import type { QuoteStatus } from '@ggis/domain';
+import type { GygStatus } from './gyg/gyg';
 
-/** Colores de estado para fondo claro (reservados: no se usan como colores de serie). */
+/** Colores de estado: los pares status-*-bg / status-*-ink del sistema de diseño GYG. */
 export const STATUS_STYLE: Record<QuoteStatus, { bg: string; fg: string }> = {
-  sent: { bg: 'rgba(57, 135, 229, 0.16)', fg: '#1d5fae' },
-  negotiating: { bg: 'rgba(214, 140, 0, 0.18)', fg: '#8a5200' },
-  won: { bg: 'rgba(23, 128, 61, 0.14)', fg: '#17703a' },
-  lost: { bg: 'rgba(192, 38, 38, 0.12)', fg: '#a82222' },
-  replaced: { bg: 'rgba(111, 98, 216, 0.16)', fg: '#4f43b8' },
+  sent: { bg: 'var(--status-sent-bg)', fg: 'var(--status-sent-ink)' },
+  negotiating: { bg: 'var(--status-negotiation-bg)', fg: 'var(--status-negotiation-ink)' },
+  won: { bg: 'var(--status-won-bg)', fg: 'var(--status-won-ink)' },
+  lost: { bg: 'var(--status-lost-bg)', fg: 'var(--status-lost-ink)' },
+  replaced: { bg: 'var(--status-replaced-bg)', fg: 'var(--status-replaced-ink)' },
 };
+
+/** El sistema de diseño llama "negotiation" a En negociación; la app guarda "negotiating". */
+export const toGygStatus = (s: QuoteStatus): GygStatus => (s === 'negotiating' ? 'negotiation' : s);
+export const fromGygStatus = (s: GygStatus): QuoteStatus => (s === 'negotiation' ? 'negotiating' : s);
 
 export const levelColor = (level: 'ok' | 'warning' | 'danger') =>
   level === 'ok' ? 'var(--ok)' : level === 'warning' ? 'var(--warn)' : 'var(--danger)';

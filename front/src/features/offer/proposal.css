@@ -105,6 +105,33 @@
 .pp-opportunity p { margin: 0; font-size: 9.6pt; line-height: 1.5; }
 .pp-photo { position: relative; height: 108mm; overflow: hidden; margin-top: 7mm; background: #dbe4ea; }
 .pp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pp-fill { height: 297mm; box-sizing: border-box; display: flex; flex-direction: column; padding-bottom: 20mm; }
+.pp-photo-row { flex: 1 1 0; min-height: 45mm; margin-top: 7mm; display: grid; grid-template-columns: 1fr; gap: 4mm; }
+.pp-photo-row.with-map { grid-template-columns: 1.45fr 1fr; }
+.pp-photo-row .pp-photo { height: auto; margin-top: 0; }
+.pp-map { position: relative; overflow: hidden; background: #dbe4ea; }
+.pp-map img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pp-map .lbl {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 4mm 5mm;
+  background: rgba(8, 32, 44, 0.86);
+  color: #fff;
+}
+.pp-map .lbl b { display: block; font-size: 8pt; letter-spacing: 0.12em; text-transform: uppercase; color: #8dc9e8; }
+.pp-map .lbl span { display: block; font-size: 8.4pt; font-weight: 600; margin-top: 1mm; line-height: 1.3; }
+.pp-credit {
+  position: absolute;
+  top: 2.5mm;
+  right: 2.5mm;
+  padding: 0.8mm 2mm;
+  background: rgba(8, 32, 44, 0.7);
+  color: #fff;
+  font-size: 6.2pt;
+  border-radius: 1mm;
+}
 .pp-photo .ov {
   position: absolute;
   left: 0;

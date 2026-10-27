@@ -1,6 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { businessUnitSchema, quoteDraftSchema, quoteStatusSchema, statusChangeSchema } from '@ggis/domain';
+import {
+  businessUnitSchema,
+  quoteDraftSchema,
+  quoteStatusSchema,
+  serviceTypeSchema,
+  statusChangeSchema,
+} from '@ggis/domain';
 import { validate } from '../../lib/validate';
 import type { QuotesService } from './quotes.service';
 import type { SettingsService } from '../settings/settings.service';
@@ -9,6 +15,7 @@ import { buildCostAnalysisWorkbook } from '../reports/cost-analysis';
 const listQuery = z.object({
   status: quoteStatusSchema.optional(),
   businessUnit: businessUnitSchema.optional(),
+  serviceType: serviceTypeSchema.optional(),
   q: z.string().max(100).optional(),
 });
 
@@ -19,7 +26,14 @@ export function quotesRouter(quotes: QuotesService, settings: SettingsService): 
 
   r.get('/', (req, res) => {
     const q = validate(listQuery, req.query);
-    res.json(quotes.list({ status: q.status, businessUnit: q.businessUnit, search: q.q }));
+    res.json(
+      quotes.list({
+        status: q.status,
+        businessUnit: q.businessUnit,
+        serviceType: q.serviceType,
+        search: q.q,
+      }),
+    );
   });
 
   r.post('/', (req, res) => {

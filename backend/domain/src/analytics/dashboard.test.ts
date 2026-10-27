@@ -13,8 +13,19 @@ function q(p: Partial<QuoteSummary>): QuoteSummary {
     status: 'sent',
     businessUnit: 'cctv',
     serviceType: null,
+    contactName: '',
+    contactPhone: '',
+    contactPhone2: '',
+    identification: '',
+    transactionType: 'quote',
+    temperature: null,
+    sendStatus: null,
+    closeDate: null,
+    note: '',
     lossReason: null,
     nextFollowUp: null,
+    stage: null,
+    stageUpdatedOn: null,
     total: 1_000,
     budgetedCost: 600,
     actualCost: 0,
@@ -76,4 +87,17 @@ describe('indicadores', () => {
     expect(d.lossReasons).toEqual([{ reason: 'price', count: 1 }]);
     expect(pendingFollowUps(list, '2026-10-10')).toHaveLength(1);
   });
+
+  it('en ejecución: adjudicadas sin cerrar y en negociación con costos registrados', () => {
+    const list = [
+      q({ id: 'a', status: 'won', budgetedCost: 100, actualCost: 0 }),
+      q({ id: 'b', status: 'negotiating', budgetedCost: 100, actualCost: 70 }),
+      q({ id: 'c', status: 'negotiating', budgetedCost: 100, actualCost: 0 }),
+      q({ id: 'd', status: 'won', budgetedCost: 100, actualCost: 50, closedOn: '2026-10-01' }),
+    ];
+    const d = buildDashboard(list, '2026-10-10');
+    expect(d.inExecution).toBe(2);
+    expect(d.atRisk.map((p) => p.id)).toEqual(['b']);
+  });
 });
+

@@ -60,13 +60,13 @@ export interface AiuSuggestion {
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
 /**
- * AIU recomendado para una licitación: parte de la base sana 10/4/4 y ajusta por tamaño,
- * solución, complejidad, tipo de servicio, mano de obra, importados y forma de pago.
- * Los porcentajes se aplican sobre el costo directo.
+ * AIU sugerido para el cliente: parte de 10/4/4 y ajusta por tamaño, solución, complejidad,
+ * tipo de servicio, mano de obra, importados y forma de pago, dentro de los rangos usuales en
+ * Colombia (A 8–15%, I 1–8%, U 3–8%). Se aplica sobre el subtotal, como en v68.
  */
 export function suggestAiu(draft: QuoteDraft, totals: QuoteTotals): Suggestion<AiuSuggestion> {
   const cost = totals.directCost;
-  const reasons: string[] = ['base sana de licitación: A 10% · I 4% · U 4%'];
+  const reasons: string[] = ['base: A 10% · I 4% · U 4%'];
   let A = 10;
   let I = 4;
   let U = 4;
@@ -180,7 +180,7 @@ export function suggestAiu(draft: QuoteDraft, totals: QuoteTotals): Suggestion<A
   };
   const total = value.adminPct + value.contingencyPct + value.profitPct;
   reasons.push(
-    `AIU total ${total.toFixed(0)}% — rango sano 15%–30% para AIU sobre costo directo.`,
+    `AIU total ${total.toFixed(0)}% — rango habitual en Colombia: 25%–35% en obra, menos en suministro.`,
   );
   return { value, reasons };
 }
@@ -247,10 +247,7 @@ export function quoteWarnings(draft: QuoteDraft, breakdown: QuoteBreakdown): Quo
     out.push({
       code: 'labor-assigned',
       level: 'ok',
-      message:
-        draft.pricing.method === 'aiu'
-          ? `${formatCop(breakdown.assignableLabor)} de mano de obra cargada a ${breakdown.itemsCarryingLabor} ítem(s) · en AIU la base es el costo directo.`
-          : `${formatCop(breakdown.assignableLabor)} de mano de obra cargada a ${breakdown.itemsCarryingLabor} ítem(s) · margen objetivo ${draft.pricing.marginPct}% sobre la venta.`,
+      message: `${formatCop(breakdown.assignableLabor)} de mano de obra cargada a ${breakdown.itemsCarryingLabor} ítem(s) · precio de venta calculado para dejar ${draft.pricing.marginPct}% de margen sobre la venta.`,
     });
   }
 
@@ -273,7 +270,7 @@ export function quoteWarnings(draft: QuoteDraft, breakdown: QuoteBreakdown): Quo
     });
   }
 
-  if (draft.pricing.method !== 'aiu' && t.financingDays > 0 && totals.subtotal > 0) {
+  if (t.financingDays > 0 && totals.subtotal > 0) {
     const monthlyRate = (totals.financing / totals.subtotal / (t.financingDays / 30)) * 100;
     const ok = monthlyRate >= THRESHOLDS.minMonthlyFinancingRatePct;
     out.push({
@@ -290,11 +287,14 @@ export function quoteWarnings(draft: QuoteDraft, breakdown: QuoteBreakdown): Quo
   if (draft.pricing.method === 'aiu') {
     const a = draft.pricing.aiu;
     const aiuTotal = a.adminPct + a.contingencyPct + a.profitPct;
-    const inRange = aiuTotal >= THRESHOLDS.lowAiuTotalPct && aiuTotal <= 30;
+    // Igual que v68: siempre informa el total y avisa en rojo si queda por debajo del 15%.
+    const low = aiuTotal < THRESHOLDS.lowAiuTotalPct;
     out.push({
       code: 'aiu-total',
-      level: inRange ? 'info' : 'warning',
-      message: `AIU total ${aiuTotal.toFixed(1)}% sobre el costo directo — rango sano 15%–30%.`,
+      level: low ? 'danger' : 'info',
+      message: low
+        ? `AIU total: ${aiuTotal.toFixed(1)}% — quedas por debajo del rango habitual en Colombia (25%–35% en obra). Revisa si cubre tu gasto administrativo real.`
+        : `AIU total: ${aiuTotal.toFixed(1)}% — rango habitual en Colombia: 25%–35% en obra, menos en suministro.`,
     });
     if (a.adminPct < 5 || a.adminPct > 20) {
       out.push({

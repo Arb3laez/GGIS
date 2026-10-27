@@ -18,6 +18,7 @@
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.0.0",
     "multer": "^2.0.0",
+    "openai": "^7.43.0",
     "pino": "^9.6.0",
     "pino-http": "^10.3.0",
     "unpdf": "^1.0.0",

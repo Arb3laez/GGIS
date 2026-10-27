@@ -13,11 +13,11 @@ import {
   type Currency,
   type QuoteItem,
 } from '@ggis/domain';
-import { Maximize2, Minimize2, Package } from 'lucide-react';
+import { Package } from 'lucide-react';
 import { exchangeRateApi, useCatalog } from '../../../api/queries';
 import { SectionTitle } from '../../../shared/SectionTitle';
 import { Alerts, errorMessage, useToast } from '../../../shared/feedback';
-import { Checkbox, NumberField, NumberInput } from '../../../shared/inputs';
+import { Checkbox, formatPesos, formatPrice, NumberField, NumberInput } from '../../../shared/inputs';
 import { useBreakdown, useDraft, useEdit } from '../store';
 import { ImportPanel } from './ImportPanel';
 
@@ -30,13 +30,7 @@ const isPipeItem = (it: QuoteItem) =>
 /** Columnas de sí/no que se pueden aplicar de una vez a todos los ítems visibles. */
 type BulkBoolField = 'applyImportCost' | 'supplierVatIncluded' | 'carriesFixedLabor';
 
-export function ItemsSection({
-  expanded,
-  onToggleExpand,
-}: {
-  expanded: boolean;
-  onToggleExpand: () => void;
-}) {
+export function ItemsSection() {
   const d = useDraft();
   const edit = useEdit();
   const breakdown = useBreakdown();
@@ -108,21 +102,7 @@ export function ItemsSection({
 
   return (
     <section className="card" id="items" aria-labelledby="items-title">
-      <SectionTitle
-        icon={<Package size={16} />}
-        id="items-title"
-        right={
-          <button
-            type="button"
-            className="small"
-            onClick={onToggleExpand}
-            title={expanded ? 'Volver al resumen lateral' : 'Ver todas las columnas a la vez'}
-          >
-            {expanded ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-            {expanded ? 'Ver resumen' : 'Ampliar ítems'}
-          </button>
-        }
-      >
+      <SectionTitle icon={<Package size={16} />} id="items-title">
         Ítems de la cotización
       </SectionTitle>
       <div className="sub">
@@ -137,6 +117,7 @@ export function ItemsSection({
         <NumberField
           label="TRM del día (COP/USD)"
           value={d.exchangeRate}
+          format={formatPesos}
           onChange={(n) => n > 0 && edit((x) => void (x.exchangeRate = n))}
         />
         <NumberField
@@ -195,12 +176,7 @@ export function ItemsSection({
             ariaLabel="% M.O. para aplicar a todos"
             onChange={(n) => setBulkLaborPct(n ?? 0)}
           />
-          <button
-            type="button"
-            className="small"
-            disabled={visible.length === 0}
-            onClick={applyLaborPct}
-          >
+          <button type="button" className="small" disabled={visible.length === 0} onClick={applyLaborPct}>
             Aplicar
           </button>
         </span>
@@ -220,7 +196,7 @@ export function ItemsSection({
               <th className="col-xs">Und.</th>
               <th className="col-sm">Cant.</th>
               <th className="col-sm">Moneda</th>
-              <th className="col-md">Precio unit. material</th>
+              <th className="col-md col-money">Precio unit. material</th>
               <th className="col-xs" title="Suma el % de nacionalización y transporte">
                 ¿Nac./ transp.?
               </th>
@@ -233,9 +209,8 @@ export function ItemsSection({
               </th>
               <th className="col-md">Costo unit.</th>
               <th className="col-sm">Complej. ítem</th>
-              <th className="col-md">Precio venta unit.</th>
+              <th className="col-md col-money">Precio venta unit.</th>
               <th className="col-xs">Margen</th>
-              <th className="col-md">Venta total</th>
               <th className="col-md">Costo total</th>
               <th className="row-actions" />
             </tr>
@@ -306,8 +281,10 @@ export function ItemsSection({
                   </td>
                   <td>
                     <NumberInput
+                      key={it.currency /* se vuelve a formatear al cambiar la moneda */}
                       value={it.unitPrice}
                       ariaLabel="Precio unitario"
+                      format={(n) => formatPrice(n, it.currency)}
                       onChange={(n) => editItem(it.id, (x) => void (x.unitPrice = n ?? 0))}
                     />
                   </td>
@@ -359,7 +336,8 @@ export function ItemsSection({
                       value={it.salePriceOverride}
                       allowNull
                       ariaLabel="Precio de venta fijo"
-                      placeholder={String(Math.round(b?.saleUnitPrice ?? 0))}
+                      format={formatCop}
+                      placeholder={formatCop(b?.saleUnitPrice ?? 0)}
                       onChange={(n) =>
                         editItem(it.id, (x) => void (x.salePriceOverride = n && n > 0 ? n : null))
                       }
@@ -370,9 +348,6 @@ export function ItemsSection({
                     style={{ fontWeight: 700, color: marginColor(b?.marginPct ?? 0) }}
                   >
                     {(b?.marginPct ?? 0).toFixed(0)}%
-                  </td>
-                  <td className="num-out" style={{ color: 'var(--steel)' }}>
-                    {formatCop(b?.saleTotal)}
                   </td>
                   <td className="num-out">
                     {formatCop(b?.totalCost)}

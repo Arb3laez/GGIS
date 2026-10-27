@@ -20,6 +20,9 @@ import { CatalogService } from './modules/catalog/catalog.service';
 import { exchangeRateRouter } from './modules/exchange-rate/exchange-rate.routes';
 import { ExchangeRateService, type FetchFn } from './modules/exchange-rate/exchange-rate.service';
 import { createAiExtractor, type AiExtractor } from './modules/imports/ai-extractor';
+import { createClientResearcher, type ClientResearcher } from './modules/research/client-researcher';
+import { researchRouter } from './modules/research/research.routes';
+import { WebFetcher } from './modules/research/web-photos';
 import { importsRouter } from './modules/imports/imports.routes';
 import { ImportsService } from './modules/imports/imports.service';
 import { quotesRouter } from './modules/quotes/quotes.routes';
@@ -34,10 +37,20 @@ export interface AppDeps {
   /** Inyectables para pruebas. */
   fetchFn?: FetchFn;
   aiExtractor?: AiExtractor;
+  researcher?: ClientResearcher;
+  webFetcher?: WebFetcher;
 }
 
 /** Composición del monolito: crea los servicios de cada módulo y monta sus rutas. */
-export function createApp({ config, db, log, fetchFn, aiExtractor }: AppDeps): Express {
+export function createApp({
+  config,
+  db,
+  log,
+  fetchFn,
+  aiExtractor,
+  researcher,
+  webFetcher,
+}: AppDeps): Express {
   const catalog = new CatalogService(db);
   const quotes = new QuotesService(db, catalog);
   const refreshed = quotes.refreshSummaries();
@@ -70,7 +83,8 @@ export function createApp({ config, db, log, fetchFn, aiExtractor }: AppDeps): E
           'style-src': ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
           'font-src': ["'self'", 'https://fonts.gstatic.com'],
           'connect-src': ["'self'"],
-          'frame-src': ["'self'", 'blob:'],
+          // Google Maps para ubicar al cliente en la investigación comercial.
+          'frame-src': ["'self'", 'blob:', 'https://www.google.com', 'https://maps.google.com'],
           // HTTPS lo impone el proxy con TLS cuando exista; aquí se sirve por HTTP local.
           'upgrade-insecure-requests': null,
         },
@@ -103,6 +117,16 @@ export function createApp({ config, db, log, fetchFn, aiExtractor }: AppDeps): E
   api.use('/attachments', attachmentsRouter(attachments));
   api.use('/catalog', catalogRouter(catalog));
   api.use('/imports', importsRouter(imports, upload));
+  api.use(
+    '/research',
+    researchRouter({
+      researcher: researcher ?? createClientResearcher(config.research, log),
+      attachments,
+      web: webFetcher ?? new WebFetcher(fetchFn),
+      googleMapsKey: config.googleMapsKey,
+      fetchFn,
+    }),
+  );
   api.use('/exchange-rate', exchangeRateRouter(exchangeRate));
   api.use('/analytics', analyticsRouter(quotes));
   api.use('/backup', backupRouter(backup, backupUpload));

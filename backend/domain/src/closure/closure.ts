@@ -1,11 +1,18 @@
 import { DEFAULT_CLOSURE_CATEGORIES } from '../constants';
 import type { Closure, ClosureCategory, QuoteDraft } from '../schemas';
 import { priceForTargetMargin, type QuoteTotals } from '../pricing/engine';
+import { lineAuditSpent } from './audit';
 
-/** Costo real: suma de la bitácora; si está vacía, el valor cargado de una sola vez (legado). */
-export function actualCost(closure: Closure): number {
-  const fromLog = closure.entries.reduce((s, e) => s + e.amount, 0);
-  return fromLog > 0 ? fromLog : (closure.legacyActualCost ?? 0);
+/**
+ * Costo real: lo registrado en el comparativo de la auditoría (precios finales y todo lo dado al
+ * personal). Si está vacío, la bitácora de versiones anteriores y, por último, el valor cargado de
+ * una sola vez en el cotizador antiguo.
+ */
+export function actualCost(draft: QuoteDraft): number {
+  const fromAudit = lineAuditSpent(draft);
+  if (fromAudit > 0) return fromAudit;
+  const fromLog = draft.closure.entries.reduce((s, e) => s + e.amount, 0);
+  return fromLog > 0 ? fromLog : (draft.closure.legacyActualCost ?? 0);
 }
 
 export function costByCategory(closure: Closure): Record<string, number> {
@@ -81,7 +88,7 @@ export function analyzeClosure(draft: QuoteDraft, totals: QuoteTotals): ClosureA
   const budgetCost = totals.totalCost;
   const budgetSale = totals.total;
   const budgetProfit = budgetSale - budgetCost;
-  const cost = actualCost(draft.closure);
+  const cost = actualCost(draft);
   const actualSaleProvided = (draft.closure.actualSale ?? 0) > 0;
   const sale = actualSaleProvided ? (draft.closure.actualSale ?? 0) : budgetSale;
   const profit = sale - cost;

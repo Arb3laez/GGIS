@@ -1,178 +1,42 @@
-import { useState } from 'react';
-import {
-  analyzeClosure,
-  costByCategory,
-  formatCop,
-  formatPct,
-  newRowId,
-  removeClosureCategory,
-  todayIso,
-  type ClosureEntry,
-} from '@ggis/domain';
+import { analyzeClosure, formatCop, formatPct } from '@ggis/domain';
 import { ClipboardCheck } from 'lucide-react';
-import { useToast } from '../../../shared/feedback';
 import { SectionTitle } from '../../../shared/SectionTitle';
-import { NumberInput, NumberField, TextArea, TextField } from '../../../shared/inputs';
+import { NumberField, TextArea, TextField } from '../../../shared/inputs';
 import { levelColor } from '../../../shared/status';
+import { LineAuditPanel } from './AuditPanels';
 import { useBreakdown, useDraft, useEdit } from '../store';
 
-/** Bitácora de costos reales y auditoría paralela (solo cotizaciones adjudicadas). */
+/** Auditoría: lo cotizado frente a lo que en realidad se pagó (cotizaciones en negociación y adjudicadas). */
 export function ClosureSection() {
   const d = useDraft();
   const edit = useEdit();
-  const notify = useToast();
   const { totals } = useBreakdown();
-  const [newCategory, setNewCategory] = useState('');
   const c = d.closure;
-  const byCat = costByCategory(c);
   const a = analyzeClosure(d, totals);
-
-  const editEntry = (id: string, recipe: (e: ClosureEntry) => void) =>
-    edit((x) => {
-      const e = x.closure.entries.find((r) => r.id === id);
-      if (e) recipe(e);
-    });
 
   return (
     <section className="card" id="cierre" aria-labelledby="closure-title">
       <SectionTitle icon={<ClipboardCheck size={16} />} id="closure-title">
-        Ejecución y cierre real
+        Auditoría — ejecución y cierre real
       </SectionTitle>
       <div className="sub">
-        Registra los costos reales a medida que avanza la obra, en las mismas categorías del Resumen, para
-        comparar contra lo presupuestado.
+        Auditoría de lo cotizado frente a lo que en realidad se pagó, línea por línea: registra el precio
+        final de cada ítem y costo, y lo que se le dio al personal (abono, liquidación y bonificaciones).
       </div>
 
-      {c.categories.map((cat) => (
-        <div key={cat.id} style={{ marginTop: 14 }}>
-          <div className="filters" style={{ marginBottom: 4 }}>
-            <b style={{ fontSize: 12.5, color: 'var(--navy)' }}>{cat.name}</b>
-            <span className="spacer" style={{ flex: 1 }} />
-            <button
-              type="button"
-              className="ghost-danger small"
-              title="Sus costos se mueven a 'Otros costos del proyecto'"
-              onClick={() => {
-                try {
-                  edit((x) => void (x.closure = removeClosureCategory(x.closure, cat.id)));
-                } catch (err) {
-                  notify((err as Error).message, true);
-                }
-              }}
-            >
-              Quitar categoría
-            </button>
-          </div>
-          <table>
-            <thead>
-              <tr>
-                <th className="col-md">Fecha</th>
-                <th>Proveedor / técnico / concepto</th>
-                <th className="col-md">Valor</th>
-                <th className="col-xs" />
-              </tr>
-            </thead>
-            <tbody>
-              {c.entries
-                .filter((e) => e.categoryId === cat.id)
-                .map((e) => (
-                  <tr key={e.id}>
-                    <td>
-                      <input
-                        className="cell"
-                        type="date"
-                        value={e.date}
-                        aria-label="Fecha"
-                        onChange={(ev) => editEntry(e.id, (x) => void (x.date = ev.target.value))}
-                      />
-                    </td>
-                    <td>
-                      <input
-                        className="cell"
-                        value={e.concept}
-                        placeholder="Ej: factura proveedor, técnico X…"
-                        aria-label="Concepto"
-                        onChange={(ev) => editEntry(e.id, (x) => void (x.concept = ev.target.value))}
-                      />
-                    </td>
-                    <td>
-                      <NumberInput
-                        value={e.amount}
-                        ariaLabel="Valor"
-                        onChange={(n) => editEntry(e.id, (x) => void (x.amount = n ?? 0))}
-                      />
-                    </td>
-                    <td>
-                      <button
-                        type="button"
-                        className="ghost-danger"
-                        aria-label="Eliminar costo"
-                        onClick={() =>
-                          edit(
-                            (x) => void (x.closure.entries = x.closure.entries.filter((r) => r.id !== e.id)),
-                          )
-                        }
-                      >
-                        ×
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-          <div className="filters" style={{ justifyContent: 'space-between', marginTop: 6 }}>
-            <button
-              type="button"
-              className="small"
-              onClick={() =>
-                edit(
-                  (x) =>
-                    void x.closure.entries.push({
-                      id: newRowId(),
-                      date: todayIso(),
-                      concept: '',
-                      amount: 0,
-                      categoryId: cat.id,
-                    }),
-                )
-              }
-            >
-              + Agregar costo
-            </button>
-            <span className="num-out">Subtotal: {formatCop(byCat[cat.id])}</span>
-          </div>
-        </div>
-      ))}
+      <LineAuditPanel />
 
-      <div className="filters" style={{ marginTop: 12 }}>
-        <input
-          className="input"
-          style={{ flex: 1 }}
-          value={newCategory}
-          placeholder="Categoría adicional (ej: Transporte, Alquiler de andamios…)"
-          onChange={(e) => setNewCategory(e.target.value)}
-        />
-        <button
-          type="button"
-          className="small"
-          disabled={!newCategory.trim()}
-          onClick={() => {
-            edit((x) => void x.closure.categories.push({ id: newRowId(), name: newCategory.trim() }));
-            setNewCategory('');
-          }}
-        >
-          + Agregar categoría
-        </button>
-      </div>
+      {c.entries.length > 0 ? <LegacyLog /> : null}
 
       <div className="subtotal-line">
-        Costo real acumulado: <b>{formatCop(a.actualCost)}</b>
+        Costo real acumulado (todo lo pagado según la auditoría): <b>{formatCop(a.actualCost)}</b>
       </div>
 
       <div className="grid-2" style={{ marginTop: 14 }}>
         <NumberField
           label="Valor real cobrado al cliente"
           value={c.actualSale ?? 0}
+          format={formatCop}
           onChange={(n) => edit((x) => void (x.closure.actualSale = n > 0 ? n : null))}
         />
         <TextField
@@ -352,5 +216,46 @@ function ClosureAnalysisView({
           : `Vendiste en ${formatCop(a.actualSale)} — por debajo de lo necesario para 15% con este costo real. Sube el precio de referencia en ofertas similares.`}
       </div>
     </div>
+  );
+}
+
+/**
+ * Bitácora de costos de versiones anteriores (solo lectura). Se muestra cuando la cotización la
+ * trae; cuenta como costo real mientras la auditoría esté vacía.
+ */
+function LegacyLog() {
+  const d = useDraft();
+  const c = d.closure;
+  const name = new Map(c.categories.map((cat) => [cat.id, cat.name]));
+  const total = c.entries.reduce((s, e) => s + e.amount, 0);
+  return (
+    <details style={{ marginTop: 12 }}>
+      <summary className="hint" style={{ cursor: 'pointer' }}>
+        Bitácora de costos anterior ({c.entries.length} registros · {formatCop(total)}) — solo lectura
+      </summary>
+      <table style={{ marginTop: 6 }}>
+        <thead>
+          <tr>
+            <th className="col-md">Fecha</th>
+            <th>Categoría</th>
+            <th>Concepto</th>
+            <th className="col-md">Valor</th>
+          </tr>
+        </thead>
+        <tbody>
+          {c.entries.map((e) => (
+            <tr key={e.id}>
+              <td>{e.date || '—'}</td>
+              <td>{name.get(e.categoryId) ?? e.categoryId}</td>
+              <td>{e.concept || '—'}</td>
+              <td className="num-out">{formatCop(e.amount)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div className="hint" style={{ marginTop: 4 }}>
+        Mientras la auditoría de arriba esté vacía, este valor se usa como costo real del proyecto.
+      </div>
+    </details>
   );
 }

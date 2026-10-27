@@ -144,7 +144,14 @@ export function buildDashboard(list: QuoteSummary[], todayIso: string): Dashboar
   }
 
   const decided = byStatus.won.count + byStatus.lost.count;
-  const inExecution = list.filter((q) => q.status === 'won' && !q.closedOn && q.budgetedCost > 0);
+  // En ejecución: adjudicadas sin cerrar y, de las que están en negociación, las que ya tienen
+  // costos registrados en la auditoría.
+  const inExecution = list.filter(
+    (q) =>
+      !q.closedOn &&
+      q.budgetedCost > 0 &&
+      (q.status === 'won' || (q.status === 'negotiating' && q.actualCost > 0)),
+  );
   const atRisk = inExecution
     .map((q) => {
       const sale = saleOf(q);

@@ -11,12 +11,8 @@ import {
   type QuoteItem,
 } from '@ggis/domain';
 import proposalCss from './proposal.css?raw';
-import {
-  describeItem,
-  effectiveBusinessUnit,
-  fillTerms,
-  proposalContent,
-} from './proposal-content';
+import { describeItem, effectiveBusinessUnit, fillTerms, proposalContent } from './proposal-content';
+import { attachmentUrl, LibraryImage, offerImages, photoCredit } from '../../shared/LibraryImage';
 
 const ITEMS_PER_PAGE = 9;
 
@@ -31,8 +27,7 @@ const matches = (item: QuoteItem, patterns: string[]) => {
   return patterns.some((p) => text.includes(p));
 };
 
-const quantityText = (n: number) =>
-  new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(n);
+const quantityText = (n: number) => new Intl.NumberFormat('es-CO', { maximumFractionDigits: 2 }).format(n);
 
 /** Título corto y especificación para la tabla; en CCTV sigue el lenguaje de la propuesta base. */
 function proposalItem(item: QuoteItem, unit: string | null): { title: string; detail: string } {
@@ -95,14 +90,19 @@ function SectionHead({ number, title }: { number: string; title: string }) {
 
 export function ProposalDocument({ quote: q, company }: { quote: Quote; company: CompanyProfile }) {
   const { totals: t, items } = computeQuote(q);
-  const billable = q.items
-    .map((it, i) => ({ it, b: items[i]! }))
-    .filter(({ b }) => b.isBillable);
+  const billable = q.items.map((it, i) => ({ it, b: items[i]! })).filter(({ b }) => b.isBillable);
   const content = proposalContent(q);
   const unit = effectiveBusinessUnit(q);
   const unitLabel = unit ? BUSINESS_UNIT_LABELS[unit] : '';
-  const needImage = unit === 'cctv' ? '/offer/camera.jpg' : '/offer/warehouse.jpg';
-  const architectureImage = unit === 'cctv' ? '/offer/control-room.jpg' : '/offer/cover.jpg';
+  // Imágenes alusivas: las generadas con IA en la investigación o, si no hay, la biblioteca G&G.
+  const needImages = offerImages(q.research, unit, 'need');
+  const architectureImages = offerImages(q.research, unit, 'solution');
+  const clientAddress = q.research?.address || '';
+  const projectSite = q.research?.projectSite || '';
+  const mapImage = q.research?.mapImage ?? null;
+  const needCredit = photoCredit(q.research, 'need');
+  const solutionCredit = photoCredit(q.research, 'solution');
+  const opportunity = q.research?.proposalText.trim() || content.opportunity;
   const serviceLabel = q.serviceType ? SERVICE_TYPE_LABELS[q.serviceType] : '';
   const unitLine = [unitLabel, serviceLabel].filter(Boolean).join(' · ') || 'Solución integral';
   const validUntil = formatLongDate(addDaysIso(q.issueDate, q.validDays));
@@ -197,7 +197,7 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
 
       {/* 02 · NECESIDAD */}
       <section className="pp-page">
-        <div className="pp-pad">
+        <div className="pp-pad pp-fill">
           <PageHead left="G&G Innova Solutions" right="01 / La necesidad" />
           <SectionHead number="01" title={content.needTitle} />
           <p className="pp-intro">{content.needIntro}</p>
@@ -219,19 +219,45 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
               <div className="k">Unidad</div>
               <div className="v">{unitLine}</div>
             </div>
+            {clientAddress ? (
+              <div>
+                <div className="k">Dirección</div>
+                <div className="v">{clientAddress}</div>
+              </div>
+            ) : null}
+            {projectSite ? (
+              <div>
+                <div className="k">Sitio del proyecto</div>
+                <div className="v">{projectSite}</div>
+              </div>
+            ) : null}
           </div>
 
           <div className="pp-opportunity">
             <div className="k">La oportunidad</div>
-            <p>{content.opportunity}</p>
+            <p>{opportunity}</p>
           </div>
 
-          <div className="pp-photo">
-            <img src={needImage} alt="Operación del cliente" />
-            <div className="ov">
-              <b>{content.needCaption}</b>
-              <span>{content.needSubcaption}</span>
+          {/* La foto (y el mapa) ocupan el espacio que quede en la página, sin tapar el pie. */}
+          <div className={mapImage ? 'pp-photo-row with-map' : 'pp-photo-row'}>
+            <div className="pp-photo">
+              <LibraryImage candidates={needImages} alt="Instalaciones del cliente" />
+              {needCredit ? <div className="pp-credit">Foto: {needCredit}</div> : null}
+              <div className="ov">
+                <b>{content.needCaption}</b>
+                <span>{content.needSubcaption}</span>
+              </div>
             </div>
+            {mapImage ? (
+              <div className="pp-map">
+                <img src={attachmentUrl(mapImage)} alt="Ubicación en Google Maps" />
+                <div className="pp-credit">Google Maps</div>
+                <div className="lbl">
+                  <b>Ubicación</b>
+                  <span>{clientAddress || q.research?.location || q.client.city}</span>
+                </div>
+              </div>
+            ) : null}
           </div>
           <PageFooter page={2} total={totalPages} number={q.number} />
         </div>
@@ -246,7 +272,8 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
 
           <div className="pp-media-grid">
             <div className="pp-media">
-              <img src={architectureImage} alt="Operación y monitoreo" />
+              <LibraryImage candidates={architectureImages} alt="Operación y monitoreo" />
+              {solutionCredit ? <div className="pp-credit">Foto: {solutionCredit}</div> : null}
               <div className="label">{content.architectureCaption}</div>
             </div>
             <div className="pp-diagram">
@@ -340,19 +367,19 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
                     pageItems.map(({ it, b }, i) => {
                       const meta = proposalItem(it, unit);
                       return (
-                      <tr key={it.id}>
-                        <td className="n">{String(start + i + 1).padStart(2, '0')}</td>
-                        <td className="comp">
-                          <b>{meta.title}</b>
-                          <span>{meta.detail}</span>
-                        </td>
-                        <td className="cant">
-                          {quantityText(it.quantity)}
-                          <small>{it.unit || 'UN'}</small>
-                        </td>
-                        <td className="money mut">{formatCop(b.saleUnitPrice)}</td>
-                        <td className="money">{formatCop(b.saleTotal)}</td>
-                      </tr>
+                        <tr key={it.id}>
+                          <td className="n">{String(start + i + 1).padStart(2, '0')}</td>
+                          <td className="comp">
+                            <b>{meta.title}</b>
+                            <span>{meta.detail}</span>
+                          </td>
+                          <td className="cant">
+                            {quantityText(it.quantity)}
+                            <small>{it.unit || 'UN'}</small>
+                          </td>
+                          <td className="money mut">{formatCop(b.saleUnitPrice)}</td>
+                          <td className="money">{formatCop(b.saleTotal)}</td>
+                        </tr>
                       );
                     })
                   ) : (
@@ -516,8 +543,9 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
             <img className="logo" src="/brand/gyg.png" alt={company.tradeName} />
             <h3>Aprobación de la propuesta</h3>
             <p>
-              Con la aprobación de esta oferta, el cliente confirma el interés en avanzar con el alcance descrito
-              y acepta que cualquier adicional deberá cotizarse y aprobarse por escrito antes de ejecutarse.
+              Con la aprobación de esta oferta, el cliente confirma el interés en avanzar con el alcance
+              descrito y acepta que cualquier adicional deberá cotizarse y aprobarse por escrito antes de
+              ejecutarse.
             </p>
             <div className="pp-signs">
               <div className="pp-sign">

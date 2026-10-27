@@ -10,6 +10,8 @@ import { loadConfig } from './config';
 import { openDatabase, type Database } from './db/database';
 import { createLogger } from './lib/logger';
 import type { AiExtractor } from './modules/imports/ai-extractor';
+import { ResearchError, type ClientResearcher } from './modules/research/client-researcher';
+import { WebFetcher } from './modules/research/web-photos';
 
 let tmp: string;
 let db: Database;
@@ -20,6 +22,47 @@ const fakeAi: AiExtractor = {
   extract: async () => [
     { description: 'Detector de humo', unit: 'UN', quantity: 12, currency: 'COP', unitPrice: 95_000 },
   ],
+};
+
+/** Web simulada para las fotos reales: una página ficticia con su foto destacada. */
+const fakeWeb = new WebFetcher(
+  (async (input: string | URL | Request) =>
+    String(input).endsWith('.jpg')
+      ? new Response(Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(40 * 1024, 1)]))
+      : new Response('<meta property="og:image" content="/fachada.jpg">', {
+          headers: { 'content-type': 'text/html' },
+        })) as typeof fetch,
+  async () => ['93.184.216.34'],
+);
+
+/** Investigador simulado: no llama a la API real (datos ficticios). */
+const fakeResearcher: ClientResearcher = {
+  enabled: true,
+  research: async (req) => {
+    if (req.clientName === 'Falla Demo')
+      throw new ResearchError('No hay conexión con el servicio de IA.', true);
+    return {
+      summary: `${req.clientName} es una empresa ficticia de comercio.`,
+      sector: 'Comercio',
+      location: 'Calle 1 # 2-3, Barranquilla',
+      address: 'Calle 1 # 2-3',
+      projectSite: 'Sede principal, Barranquilla',
+      facilities: [
+        { name: 'Sede principal', city: 'Barranquilla', address: 'Calle 1 # 2-3', kind: 'retail' },
+      ],
+      project: 'Antihurto para la sede principal.',
+      risks: ['Hurto en piso de venta'],
+      proposalText: 'Entendemos que su operación de venta necesita control de pérdidas.',
+      imageTheme: 'retail',
+      sources: [{ title: 'Sitio demo', url: 'https://example.com' }],
+      imagePrompts: { need: 'Retail store interior', solution: 'Anti-theft gates at a store entrance' },
+      images: { need: null, solution: null },
+      photos: [],
+      mapImage: null,
+    };
+  },
+  // JPG mínimo (solo la firma) para probar que se guarda como adjunto.
+  generateImage: async () => Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0]),
 };
 
 const fakeFetch = (async (url: string | URL | Request) => {
@@ -50,6 +93,8 @@ beforeEach(() => {
     log: createLogger('silent', false),
     fetchFn: fakeFetch,
     aiExtractor: fakeAi,
+    researcher: fakeResearcher,
+    webFetcher: fakeWeb,
   });
 });
 
@@ -100,6 +145,101 @@ describe('cotizaciones', () => {
     expect(lost.body.lossReason).toBe('price');
     const won = await request(app).patch(`/api/quotes/${q.id}/status`).send({ status: 'won' }).expect(200);
     expect(won.body.lossReason).toBeNull();
+  });
+
+  it('listado tipo CRM: contacto, teléfono y etapa del seguimiento con su fecha', async () => {
+    const draft = sampleDraft();
+    draft.client = { ...draft.client, contact: 'Contacto Demo', phone: '300 000 0000' };
+    const created = await request(app).post('/api/quotes').send(draft).expect(201);
+    expect(created.body.stage).toBeNull();
+
+    const replied = await request(app)
+      .patch(`/api/quotes/${created.body.id}/status`)
+      .send({ status: 'negotiating', stage: '  Llamar el lunes  ' })
+      .expect(200);
+    expect(replied.body).toMatchObject({ status: 'negotiating', stage: 'Llamar el lunes' });
+    expect(replied.body.stageUpdatedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+
+    // Cambiar solo el estado conserva la etapa.
+    const kept = await request(app)
+      .patch(`/api/quotes/${created.body.id}/status`)
+      .send({ status: 'sent' })
+      .expect(200);
+    expect(kept.body.stage).toBe('Llamar el lunes');
+
+    // Vacío = sin etapa.
+    const cleared = await request(app)
+      .patch(`/api/quotes/${created.body.id}/status`)
+      .send({ status: 'sent', stage: '' })
+      .expect(200);
+    expect(cleared.body).toMatchObject({ stage: null, stageUpdatedOn: null });
+    await request(app)
+      .patch(`/api/quotes/${created.body.id}/status`)
+      .send({ status: 'sent', stage: 'Cliente respondió' })
+      .expect(200);
+
+    const list = await request(app).get('/api/quotes?q=300').expect(200);
+    expect(list.body[0]).toMatchObject({
+      contactName: 'Contacto Demo',
+      contactPhone: '300 000 0000',
+      stage: 'Cliente respondió',
+    });
+  });
+
+  it('filtra el listado por tipo de servicio', async () => {
+    const preventive = { ...sampleDraft(), serviceType: 'preventive' as const };
+    const supply = { ...sampleDraft(), serviceType: 'supply' as const };
+    await request(app).post('/api/quotes').send(preventive).expect(201);
+    await request(app).post('/api/quotes').send(supply).expect(201);
+    const list = await request(app).get('/api/quotes?serviceType=preventive').expect(200);
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].serviceType).toBe('preventive');
+    await request(app).get('/api/quotes?serviceType=otro').expect(422);
+  });
+
+  it('investiga al cliente y devuelve el resultado estructurado con fecha', async () => {
+    const res = await request(app)
+      .post('/api/research')
+      .send({ clientName: 'Comercial Demo S.A.S.', businessUnit: 'anti_theft' })
+      .expect(200);
+    expect(res.body).toMatchObject({ sector: 'Comercio', imageTheme: 'retail' });
+    expect(res.body.researchedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    await request(app).post('/api/research').send({ clientName: '' }).expect(422);
+    const fail = await request(app).post('/api/research').send({ clientName: 'Falla Demo' }).expect(503);
+    expect(fail.body.error.code).toBe('research_failed');
+  });
+
+  it('trae fotos reales de la web con su crédito; sin llave de Google no hay mapa', async () => {
+    const q = await createQuote();
+    const res = await request(app)
+      .post('/api/research/photos')
+      .send({ quoteId: q.id, pages: [{ url: 'https://www.clinica-demo.test/', title: 'Clínica Demo' }] })
+      .expect(201);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0]).toMatchObject({ credit: 'clinica-demo.test', sourceTitle: 'Clínica Demo' });
+    await request(app).get(`/api/attachments/${res.body[0].attachmentId}/file`).expect(200);
+    const caps = await request(app).get('/api/research/capabilities').expect(200);
+    expect(caps.body.maps).toBe(false);
+    await request(app).post('/api/research/map').send({ quoteId: q.id, query: 'Barranquilla' }).expect(503);
+  });
+
+  it('genera la imagen alusiva y la guarda como adjunto de la cotización', async () => {
+    const q = await createQuote();
+    const prompt = 'Retail store interior with anti-theft gates';
+    const img = await request(app)
+      .post('/api/research/images')
+      .send({ quoteId: q.id, slot: 'need', prompt })
+      .expect(201);
+    expect(img.body).toMatchObject({
+      quoteId: q.id,
+      mimeType: 'image/jpeg',
+      fileName: 'imagen-ia-operacion.jpg',
+    });
+    await request(app).get(`/api/attachments/${img.body.id}/file`).expect(200);
+    await request(app)
+      .post('/api/research/images')
+      .send({ quoteId: '00000000-0000-4000-8000-000000000000', slot: 'need', prompt })
+      .expect(404);
   });
 
   it('duplica con número nuevo y borra lógicamente', async () => {

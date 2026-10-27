@@ -23,6 +23,7 @@ export interface QuoteRecord {
 export interface QuoteListFilter {
   status?: QuoteStatus;
   businessUnit?: BusinessUnit;
+  serviceType?: ServiceType;
   search?: string;
 }
 
@@ -36,14 +37,47 @@ function withDefaults(raw: unknown): QuoteDraft {
 
 const SUMMARY_COLUMNS = `id, number, client_name, project_name, issue_date, valid_days, status, business_unit,
   service_type, loss_reason, next_follow_up, total, budgeted_cost, actual_cost, actual_sale, closed_on, updated_at,
-  supersedes_number, superseded_by_number`;
+  supersedes_number, superseded_by_number, contact_name, contact_phone, stage, stage_updated_on, crm`;
+
+/** Campos del seguimiento comercial que se guardan juntos en la columna JSON `crm`. */
+type CrmColumns = Pick<
+  QuoteSummary,
+  | 'contactPhone2'
+  | 'identification'
+  | 'transactionType'
+  | 'temperature'
+  | 'sendStatus'
+  | 'closeDate'
+  | 'note'
+>;
+
+function crmOf(raw: unknown): CrmColumns {
+  let c: Partial<CrmColumns> = {};
+  try {
+    c = JSON.parse(String(raw ?? '{}')) as Partial<CrmColumns>;
+  } catch {
+    /* columna dañada: se usan los valores vacíos */
+  }
+  return {
+    contactPhone2: c.contactPhone2 ?? '',
+    identification: c.identification ?? '',
+    transactionType: c.transactionType ?? 'quote',
+    temperature: c.temperature ?? null,
+    sendStatus: c.sendStatus ?? null,
+    closeDate: c.closeDate ?? null,
+    note: c.note ?? '',
+  };
+}
 
 function toSummary(r: Row): QuoteSummary {
   return {
+    ...crmOf(r.crm),
     id: String(r.id),
     number: String(r.number),
     clientName: String(r.client_name ?? ''),
     projectName: String(r.project_name ?? ''),
+    contactName: String(r.contact_name ?? ''),
+    contactPhone: String(r.contact_phone ?? ''),
     issueDate: String(r.issue_date),
     validDays: Number(r.valid_days),
     status: r.status as QuoteStatus,
@@ -51,6 +85,8 @@ function toSummary(r: Row): QuoteSummary {
     serviceType: (r.service_type as ServiceType | null) ?? null,
     lossReason: (r.loss_reason as LossReason | null) ?? null,
     nextFollowUp: (r.next_follow_up as string | null) ?? null,
+    stage: (r.stage as string | null) ?? null,
+    stageUpdatedOn: (r.stage_updated_on as string | null) ?? null,
     total: Number(r.total),
     budgetedCost: Number(r.budgeted_cost),
     actualCost: Number(r.actual_cost),
@@ -80,6 +116,19 @@ function summaryParams(s: QuoteSummary) {
     $closed_on: s.closedOn,
     $supersedes_number: s.supersedesNumber,
     $superseded_by_number: s.supersededByNumber,
+    $contact_name: s.contactName,
+    $contact_phone: s.contactPhone,
+    $stage: s.stage,
+    $stage_updated_on: s.stageUpdatedOn,
+    $crm: JSON.stringify({
+      contactPhone2: s.contactPhone2,
+      identification: s.identification,
+      transactionType: s.transactionType,
+      temperature: s.temperature,
+      sendStatus: s.sendStatus,
+      closeDate: s.closeDate,
+      note: s.note,
+    } satisfies CrmColumns),
   };
 }
 
@@ -98,8 +147,12 @@ export class QuotesRepository {
       where.push('business_unit = $unit');
       params.$unit = filter.businessUnit;
     }
+    if (filter.serviceType) {
+      where.push('service_type = $service');
+      params.$service = filter.serviceType;
+    }
     if (filter.search) {
-      where.push('(client_name LIKE $q OR project_name LIKE $q OR number LIKE $q)');
+      where.push('(client_name LIKE $q OR project_name LIKE $q OR number LIKE $q OR contact_name LIKE $q OR contact_phone LIKE $q OR crm LIKE $q)');
       params.$q = `%${filter.search.replace(/[%_]/g, '')}%`;
     }
     const rows = this.db
@@ -133,10 +186,12 @@ export class QuotesRepository {
       .prepare(
         `INSERT INTO quotes (id, number, status, business_unit, service_type, client_name, project_name, issue_date,
            valid_days, loss_reason, next_follow_up, total, budgeted_cost, actual_cost, actual_sale, closed_on,
-           supersedes_number, superseded_by_number, data, version, created_at, updated_at)
+           supersedes_number, superseded_by_number, contact_name, contact_phone, stage, stage_updated_on, crm,
+           data, version, created_at, updated_at)
          VALUES ($id, $number, $status, $business_unit, $service_type, $client_name, $project_name, $issue_date,
            $valid_days, $loss_reason, $next_follow_up, $total, $budgeted_cost, $actual_cost, $actual_sale, $closed_on,
-           $supersedes_number, $superseded_by_number, $data, $version, $created_at, $updated_at)`,
+           $supersedes_number, $superseded_by_number, $contact_name, $contact_phone, $stage, $stage_updated_on, $crm,
+           $data, $version, $created_at, $updated_at)`,
       )
       .run({
         $id: record.id,
@@ -157,7 +212,9 @@ export class QuotesRepository {
            client_name = $client_name, project_name = $project_name, issue_date = $issue_date, valid_days = $valid_days,
            loss_reason = $loss_reason, next_follow_up = $next_follow_up, total = $total, budgeted_cost = $budgeted_cost,
            actual_cost = $actual_cost, actual_sale = $actual_sale, closed_on = $closed_on,
-           supersedes_number = $supersedes_number, superseded_by_number = $superseded_by_number, data = $data,
+           supersedes_number = $supersedes_number, superseded_by_number = $superseded_by_number,
+           contact_name = $contact_name, contact_phone = $contact_phone, stage = $stage,
+           stage_updated_on = $stage_updated_on, crm = $crm, data = $data,
            version = $version, updated_at = $updated_at
          WHERE id = $id AND version = $expected AND deleted_at IS NULL`,
       )
@@ -194,7 +251,9 @@ export class QuotesRepository {
            client_name = $client_name, project_name = $project_name, issue_date = $issue_date, valid_days = $valid_days,
            loss_reason = $loss_reason, next_follow_up = $next_follow_up, total = $total, budgeted_cost = $budgeted_cost,
            actual_cost = $actual_cost, actual_sale = $actual_sale, closed_on = $closed_on,
-           supersedes_number = $supersedes_number, superseded_by_number = $superseded_by_number
+           supersedes_number = $supersedes_number, superseded_by_number = $superseded_by_number,
+           contact_name = $contact_name, contact_phone = $contact_phone, stage = $stage,
+           stage_updated_on = $stage_updated_on, crm = $crm
          WHERE id = $id`,
       )
       .run({ $id: id, ...summaryParams(summary) });

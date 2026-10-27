@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { blankItem, type ImportedRow } from '@ggis/domain';
 import { importsApi, keys, useImportCapabilities } from '../../../api/queries';
 import { errorMessage, useToast } from '../../../shared/feedback';
-import { NumberInput } from '../../../shared/inputs';
+import { formatPrice, NumberInput } from '../../../shared/inputs';
 import { useEdit, useEditor } from '../store';
 
 type PreviewRow = ImportedRow & { selected: boolean };
@@ -220,7 +220,13 @@ export function ImportPanel() {
                       </select>
                     </td>
                     <td>
-                      <NumberInput value={r.unitPrice} onChange={(n) => setRow(i, { unitPrice: n ?? 0 })} />
+                      <NumberInput
+                        key={r.currency /* se vuelve a formatear al cambiar la moneda */}
+                        value={r.unitPrice}
+                        ariaLabel="Precio unitario"
+                        format={(n) => formatPrice(n, r.currency)}
+                        onChange={(n) => setRow(i, { unitPrice: n ?? 0 })}
+                      />
                     </td>
                   </tr>
                 ))}

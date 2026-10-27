@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   BUSINESS_UNIT_LABELS,
@@ -11,8 +11,21 @@ import {
 } from '@ggis/domain';
 import { downloadFrom, saveBlob } from '../../api/http';
 import { useCompanyProfile, useQuote } from '../../api/queries';
-import { ArrowLeft, Copy, Download, FolderSync, Mail, Printer } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronDown,
+  Copy,
+  Download,
+  FileCode,
+  FileDown,
+  FileSpreadsheet,
+  FolderSync,
+  Image,
+  Mail,
+  Printer,
+} from 'lucide-react';
 import { errorMessage, useToast } from '../../shared/feedback';
+import { attachmentUrl } from '../../shared/LibraryImage';
 import { ProposalDocument } from './ProposalDocument';
 import proposalCss from './proposal.css?raw';
 
@@ -92,6 +105,24 @@ export function OfferPage() {
   const docRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState<ReturnType<typeof emailDraft> | null>(null);
   const [dropboxPath, setDropboxPath] = useState<string | null>(null);
+  const [downloadsOpen, setDownloadsOpen] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const downloadsRef = useRef<HTMLDivElement>(null);
+
+  // El menú de descargas se cierra al hacer clic fuera o con Escape.
+  useEffect(() => {
+    if (!downloadsOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (!downloadsRef.current?.contains(e.target as Node)) setDownloadsOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDownloadsOpen(false);
+    document.addEventListener('mousedown', onClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [downloadsOpen]);
 
   if (error) return <div className="alert danger">{errorMessage(error)}</div>;
   if (!quote || !company) return <div className="empty">Cargando oferta…</div>;
@@ -131,6 +162,40 @@ export function OfferPage() {
     win.onload = () => win.setTimeout(trigger, 300);
   }
 
+  /**
+   * Descarga la oferta como archivo PDF: cada página A4 se convierte en imagen (con la fuente
+   * incrustada) y se arma el PDF en el navegador, sin pasar por el diálogo de impresión.
+   */
+  async function downloadPdf() {
+    const pages = [...(docRef.current?.querySelectorAll<HTMLElement>('.pp-page') ?? [])];
+    if (!pages.length) return;
+    setPdfBusy(true);
+    try {
+      const [{ toJpeg, getFontEmbedCSS }, { jsPDF }] = await Promise.all([
+        import('html-to-image'),
+        import('jspdf'),
+      ]);
+      await document.fonts.ready;
+      const fontEmbedCSS = await getFontEmbedCSS(pages[0]!);
+      const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+      for (const [i, page] of pages.entries()) {
+        const image = await toJpeg(page, {
+          quality: 0.9,
+          pixelRatio: 2,
+          backgroundColor: '#ffffff',
+          fontEmbedCSS,
+          // Sin la sombra ni el margen de la vista en pantalla.
+          style: { margin: '0', boxShadow: 'none' },
+        });
+        if (i > 0) pdf.addPage();
+        pdf.addImage(image, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+      }
+      pdf.save(`${baseName}.pdf`);
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   async function downloadHtml() {
     if (!docRef.current) return;
     const content = await inlineImages(docRef.current);
@@ -158,6 +223,21 @@ export function OfferPage() {
     }
   }
 
+  /** Ejecuta una descarga del menú y lo cierra; los errores se avisan. */
+  async function download(action: () => Promise<void> | void) {
+    setDownloadsOpen(false);
+    try {
+      await action();
+    } catch (err) {
+      notify(errorMessage(err), true);
+    }
+  }
+
+  const aiImages = [
+    { id: quote.research?.images.need ?? null, label: 'Imagen IA · La necesidad', name: 'necesidad' },
+    { id: quote.research?.images.solution ?? null, label: 'Imagen IA · La solución', name: 'solucion' },
+  ].filter((x): x is { id: string; label: string; name: string } => !!x.id);
+
   return (
     <div className="offer-page" style={{ maxWidth: 1000, margin: '0 auto' }}>
       <div className="editor-head no-print">
@@ -178,9 +258,55 @@ export function OfferPage() {
           <button type="button" onClick={() => void dropboxPackage()}>
             <FolderSync size={16} /> Paquete Dropbox
           </button>
-          <button type="button" onClick={() => void downloadHtml()}>
-            <Download size={16} /> HTML
-          </button>
+          <div className="menu-wrap" ref={downloadsRef}>
+            <button
+              type="button"
+              aria-haspopup="menu"
+              aria-expanded={downloadsOpen}
+              disabled={pdfBusy}
+              onClick={() => setDownloadsOpen((o) => !o)}
+            >
+              <Download size={16} /> {pdfBusy ? 'Generando PDF…' : 'Descargas'} <ChevronDown size={14} />
+            </button>
+            {downloadsOpen ? (
+              <div className="menu" role="menu">
+                <button type="button" role="menuitem" onClick={() => void download(downloadPdf)}>
+                  <FileDown size={15} /> Oferta en PDF
+                </button>
+                <button type="button" role="menuitem" onClick={() => void download(downloadHtml)}>
+                  <FileCode size={15} /> Oferta en HTML
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() =>
+                    void download(() =>
+                      downloadFrom(
+                        `/api/quotes/${quote.id}/cost-analysis.xlsx`,
+                        `${baseName} - análisis.xlsx`,
+                      ),
+                    )
+                  }
+                >
+                  <FileSpreadsheet size={15} /> Análisis de costos (Excel)
+                </button>
+                {aiImages.map((img) => (
+                  <button
+                    key={img.id}
+                    type="button"
+                    role="menuitem"
+                    onClick={() =>
+                      void download(() =>
+                        downloadFrom(attachmentUrl(img.id), `${baseName} - ${img.name}.jpg`),
+                      )
+                    }
+                  >
+                    <Image size={15} /> {img.label}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
           <button
             type="button"
             className="primary"

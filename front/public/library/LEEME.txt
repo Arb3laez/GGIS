@@ -1,0 +1,20 @@
+Biblioteca de imágenes G&G para las ofertas
+============================================
+
+Copie aquí fotos propias (o libres de derechos) en formato .jpg. La oferta elige la imagen según
+la unidad de negocio de la cotización y el tipo de instalación que encontró la investigación del
+cliente, en este orden:
+
+  1. <unidad>-<instalación>.jpg   ejemplo: cctv-retail.jpg
+  2. <instalación>.jpg            ejemplo: retail.jpg
+  3. <unidad>.jpg                 ejemplo: fire.jpg
+  4. las imágenes base de la oferta (si no hay ninguna de las anteriores)
+
+Unidades de negocio:   cctv, fire, access_control, anti_theft, solt
+Tipos de instalación:  warehouse (bodega), retail (tienda), hotel, industrial (planta),
+                       office (oficinas), education (colegio/universidad), health (clínica),
+                       residential (conjunto residencial), fuel (estación de servicio), other
+
+Recomendado: fotos horizontales de al menos 1600 px de ancho y menos de 500 KB.
+No use fotos de clientes reales sin su autorización.
+Después de agregar fotos, reconstruya la aplicación (docker compose up -d --build).

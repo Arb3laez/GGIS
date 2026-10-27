@@ -85,4 +85,21 @@ export const migrations: string[] = [
   /* v5 — tipo de servicio de la cotización (suministro, mantenimiento, etc.) */ `
   ALTER TABLE quotes ADD COLUMN service_type TEXT;
   `,
+
+  /* v6 — listado tipo CRM: contacto, teléfono y etapa del seguimiento comercial.
+     Todas las cotizaciones existentes quedan con la etapa en null; el contacto y el teléfono
+     se llenan al arrancar con el recálculo de resúmenes (refreshSummaries). */ `
+  ALTER TABLE quotes ADD COLUMN contact_name TEXT NOT NULL DEFAULT '';
+  ALTER TABLE quotes ADD COLUMN contact_phone TEXT NOT NULL DEFAULT '';
+  ALTER TABLE quotes ADD COLUMN stage TEXT;
+  ALTER TABLE quotes ADD COLUMN stage_updated_on TEXT;
+  UPDATE quotes SET stage = NULL, stage_updated_on = NULL,
+    data = json_set(data, '$.stage', json('null'), '$.stageUpdatedOn', json('null'));
+  `,
+
+  /* v7 — sistema de diseño GYG / Excel CRM Ventas: campos del seguimiento para el listado
+     (NIT, teléfono 2, tipo de transacción, temperatura, envío, cierre estimado, observación,
+     columnas 1 y 2) en una columna JSON. Se llena al arrancar con refreshSummaries. */ `
+  ALTER TABLE quotes ADD COLUMN crm TEXT NOT NULL DEFAULT '{}';
+  `,
 ];

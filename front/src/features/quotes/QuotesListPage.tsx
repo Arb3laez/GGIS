@@ -1,380 +1,406 @@
-import { useRef } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  ArrowRightLeft,
-  Copy,
-  Download,
-  FileSpreadsheet,
-  FileText,
-  Plus,
-  Search,
-  Trash2,
-  Upload,
-} from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   BUSINESS_UNIT_LABELS,
   BUSINESS_UNITS,
   daysBetween,
+  FOLLOW_UP_STAGES,
   formatCop,
   QUOTE_STATUS_LABELS,
-  QUOTE_STATUSES,
+  SEND_STATUS_LABELS,
+  SEND_STATUSES,
   SERVICE_TYPE_LABELS,
+  SERVICE_TYPES,
+  TEMPERATURE_LABELS,
+  TEMPERATURES,
   todayIso,
-  type BusinessUnit,
-  type QuoteStatus,
+  TRANSACTION_TYPE_LABELS,
+  type Quote,
   type QuoteSummary,
 } from '@ggis/domain';
 import { downloadFrom } from '../../api/http';
-import { backupApi, useQuoteList, useQuoteMutations } from '../../api/queries';
+import { backupApi, quotesApi, useQuoteList, useQuoteMutations } from '../../api/queries';
 import { useConfirm } from '../../shared/confirm';
 import { errorMessage, useToast } from '../../shared/feedback';
-import { STATUS_STYLE } from '../../shared/status';
+import {
+  Button,
+  FilterPills,
+  GYG_STATUSES,
+  MONTH_OPTIONS,
+  monthOf,
+  PageHeader,
+  QuoteCard,
+  QuoteList,
+  SearchField,
+  SelectField,
+  StageSummary,
+  type QuoteAction,
+} from '../../shared/gyg/gyg';
+import { fromGygStatus, toGygStatus } from '../../shared/status';
+import { applyForm, QuoteFormPanel, type QuoteFormValue } from './QuoteFormPanel';
 
+const cap1 = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+const options = <T extends string>(first: string, keys: readonly T[], labels: Record<T, string>) => [
+  { value: '', label: first },
+  ...keys.map((k) => ({ value: k, label: labels[k] })),
+];
+
+/** Texto que encuentra la búsqueda: cliente, NIT, proyecto, contacto, teléfonos y número. */
+const searchable = (q: QuoteSummary) =>
+  [q.clientName, q.identification, q.projectName, q.contactName, q.contactPhone, q.contactPhone2, q.number]
+    .join(' ')
+    .toLowerCase();
+
+/**
+ * Pantalla Cotizaciones con el sistema de diseño GYG (QuotesScreen): resumen por etapa, filtros
+ * y tarjetas. Los filtros se aplican en el navegador sobre el listado completo y quedan en la URL.
+ */
 export function QuotesListPage() {
   const [params, setParams] = useSearchParams();
-  const status = (params.get('status') || undefined) as QuoteStatus | undefined;
-  const businessUnit = (params.get('unit') || undefined) as BusinessUnit | undefined;
-  const q = params.get('q') ?? '';
-  const { data: quotes, isLoading, error } = useQuoteList({ status, businessUnit, q: q || undefined });
+  const { data: quotes, isLoading, error } = useQuoteList({});
   const m = useQuoteMutations();
   const notify = useToast();
   const confirm = useConfirm();
   const navigate = useNavigate();
   const importInput = useRef<HTMLInputElement>(null);
+  const [editing, setEditing] = useState<{ quote: Quote; total: number } | null>(null);
+  const [saving, setSaving] = useState(false);
   const today = todayIso();
 
-  const setParam = (key: string, value: string | undefined) => {
+  const f = {
+    tab: params.get('status') ?? 'all',
+    stage: params.get('stage') ?? 'all',
+    q: params.get('q') ?? '',
+    unit: params.get('unit') ?? '',
+    svc: params.get('service') ?? '',
+    year: params.get('year') ?? '',
+    month: params.get('month') ?? '',
+    temp: params.get('temp') ?? '',
+    send: params.get('send') ?? '',
+  };
+  const setParam = (key: string) => (value: string) => {
     const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
+    if (value && value !== 'all') next.set(key, value);
     else next.delete(key);
     setParams(next, { replace: true });
   };
+
+  const rows = useMemo(() => quotes ?? [], [quotes]);
+  const term = f.q.trim().toLowerCase();
+  const shown = rows.filter(
+    (r) =>
+      (f.tab === 'all' || toGygStatus(r.status) === f.tab) &&
+      (f.stage === 'all' || r.stage === f.stage) &&
+      (!f.unit || r.businessUnit === f.unit) &&
+      (!f.svc || r.serviceType === f.svc) &&
+      (!f.year || r.issueDate.slice(0, 4) === f.year) &&
+      (!f.month || monthOf(r.issueDate) === f.month) &&
+      (!f.temp || r.temperature === f.temp) &&
+      (!f.send || r.sendStatus === f.send) &&
+      (!term || searchable(r).includes(term)),
+  );
+
+  const statusOptions = [
+    { value: 'all', label: 'Todas', count: rows.length },
+    ...GYG_STATUSES.map((s) => ({
+      value: s.value,
+      label: s.label,
+      count: rows.filter((r) => toGygStatus(r.status) === s.value).length,
+    })),
+  ];
+  const stageItems = FOLLOW_UP_STAGES.filter((s) => s.pct != null).map((s) => {
+    const inStage = rows.filter((r) => r.stage === s.value);
+    return {
+      value: s.value,
+      label: s.label,
+      pct: s.pct,
+      count: inStage.length,
+      total: inStage.reduce((n, r) => n + r.total, 0),
+    };
+  });
+  const years = [...new Set(rows.map((r) => r.issueDate.slice(0, 4)))].sort().reverse();
 
   async function importBackup(file: File) {
     try {
       const r = await backupApi.import(file);
       m.invalidate();
-      notify(
-        `Se importaron ${r.imported} cotizaciones${r.attachments ? ` y ${r.attachments} adjuntos` : ''}.`,
-      );
+      notify(`Se importaron ${r.imported} cotizaciones${r.attachments ? ` y ${r.attachments} adjuntos` : ''}.`);
       if (r.warnings.length) notify(r.warnings.slice(0, 3).join(' · '), true);
     } catch (err) {
       notify(errorMessage(err), true);
     }
   }
 
+  async function onAction(q: QuoteSummary, k: QuoteAction) {
+    switch (k) {
+      case 'view':
+        navigate(`/quotes/${q.id}/offer`);
+        return;
+      case 'edit':
+        try {
+          setEditing({ quote: await quotesApi.get(q.id), total: q.total });
+        } catch (err) {
+          notify(errorMessage(err), true);
+        }
+        return;
+      case 'duplicate':
+        m.duplicate.mutate(q.id, {
+          onSuccess: (dup) => {
+            notify(`Duplicada como ${dup.number}`);
+            navigate(`/quotes/${dup.id}`);
+          },
+          onError: (e) => notify(errorMessage(e), true),
+        });
+        return;
+      case 'copy': {
+        const text = [
+          `${q.number} · ${q.clientName || '(sin cliente)'}`,
+          q.projectName,
+          [q.contactName, q.contactPhone].filter(Boolean).join(' · '),
+          `${QUOTE_STATUS_LABELS[q.status]} · ${formatCop(q.total)}`,
+        ]
+          .filter(Boolean)
+          .join('\n');
+        try {
+          await navigator.clipboard.writeText(text);
+          notify('Resumen copiado al portapapeles');
+        } catch {
+          notify('No se pudo copiar al portapapeles', true);
+        }
+        return;
+      }
+      case 'delete': {
+        const ok = await confirm({
+          title: `¿Eliminar la ${q.number}?`,
+          message: 'Dejará de aparecer en el listado y en los indicadores. Queda guardada para auditoría.',
+          details: (
+            <>
+              <div>{q.clientName || '(sin cliente)'}</div>
+              {q.projectName ? <div className="muted">{q.projectName}</div> : null}
+              <div className="muted">
+                {QUOTE_STATUS_LABELS[q.status]} · {formatCop(q.total)}
+              </div>
+            </>
+          ),
+          confirmLabel: 'Eliminar cotización',
+          tone: 'danger',
+        });
+        if (ok) m.remove.mutate(q.id, { onError: (e) => notify(errorMessage(e), true) });
+      }
+    }
+  }
+
+  async function supersede(q: QuoteSummary) {
+    const ok = await confirm({
+      title: `¿Sustituir la ${q.number}?`,
+      message:
+        'Se crea una cotización nueva con número propio para el nuevo requerimiento. La actual queda como Sustituida y vinculada a la nueva.',
+      confirmLabel: 'Crear sustitución',
+      cancelLabel: 'Cancelar',
+    });
+    if (!ok) return;
+    m.supersede.mutate(q.id, {
+      onSuccess: (dup) => {
+        notify(`La ${q.number} quedó sustituida por ${dup.number}`);
+        navigate(`/quotes/${dup.id}`);
+      },
+      onError: (e) => notify(errorMessage(e), true),
+    });
+  }
+
+  async function saveForm(v: QuoteFormValue) {
+    if (!editing) return;
+    setSaving(true);
+    try {
+      const { id, number, version, createdAt: _c, updatedAt: _u, ...draft } = editing.quote;
+      await quotesApi.update(id, version, applyForm(draft, v));
+      m.invalidate();
+      notify(`${number} guardada`);
+      setEditing(null);
+    } catch (err) {
+      notify(errorMessage(err), true);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
-    <>
-      <div className="editor-head">
-        <div>
-          <div className="kicker">Gestión comercial</div>
-          <h1>Cotizaciones</h1>
+    <div className="gyg-screen">
+      <PageHeader title="Cotizaciones">
+        <Button
+          variant="secondary"
+          icon="download"
+          collapse
+          onClick={() =>
+            downloadFrom('/api/backup/export', 'respaldo.json').catch((e) => notify(errorMessage(e), true))
+          }
+        >
+          Exportar respaldo
+        </Button>
+        <Button
+          variant="secondary"
+          icon="upload"
+          collapse
+          title="Acepta respaldos de esta versión y del cotizador anterior (v40–v68)"
+          onClick={() => importInput.current?.click()}
+        >
+          Importar respaldo
+        </Button>
+        <Button variant="primary" icon="plus" onClick={() => navigate('/quotes/new')}>
+          Nueva cotización
+        </Button>
+        <input
+          ref={importInput}
+          type="file"
+          accept=".json"
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (file) void importBackup(file);
+          }}
+        />
+      </PageHeader>
+
+      <StageSummary
+        items={stageItems}
+        allCount={rows.length}
+        allTotal={rows.reduce((n, r) => n + r.total, 0)}
+        value={f.stage}
+        onChange={setParam('stage')}
+      />
+
+      <div className="gyg-filterbar">
+        <FilterPills options={statusOptions} value={f.tab} onChange={setParam('status')} />
+        <div className="gyg-filterbar__row">
+          <SearchField value={f.q} onChange={setParam('q')} placeholder="Cliente, NIT, proyecto, contacto, tel" />
+          <SelectField
+            label="Unidad de negocio"
+            value={f.unit}
+            onChange={setParam('unit')}
+            options={options('Todas las unidades', BUSINESS_UNITS, BUSINESS_UNIT_LABELS)}
+          />
+          <SelectField
+            label="Servicio"
+            value={f.svc}
+            onChange={setParam('service')}
+            options={options('Todos los servicios', SERVICE_TYPES, SERVICE_TYPE_LABELS)}
+          />
         </div>
-        <div className="toolbar">
-          <button
-            type="button"
-            onClick={() =>
-              downloadFrom('/api/backup/export', 'respaldo.json').catch((e) => notify(errorMessage(e), true))
-            }
-          >
-            <Download size={16} /> Exportar respaldo
-          </button>
-          <button
-            type="button"
-            onClick={() => importInput.current?.click()}
-            title="Acepta respaldos de esta versión y del cotizador anterior (v40–v68)"
-          >
-            <Upload size={16} /> Importar respaldo
-          </button>
-          <Link to="/quotes/new" className="btn primary">
-            <Plus size={16} /> Nueva cotización
-          </Link>
-          <input
-            ref={importInput}
-            type="file"
-            accept=".json"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              e.target.value = '';
-              if (f) void importBackup(f);
-            }}
+        <div className="gyg-filterbar__row gyg-filterbar__row--more">
+          <SelectField
+            label="Año"
+            value={f.year}
+            onChange={setParam('year')}
+            options={[{ value: '', label: 'Todos los años' }, ...years.map((y) => ({ value: y, label: y }))]}
+          />
+          <SelectField
+            label="Mes"
+            value={f.month}
+            onChange={setParam('month')}
+            options={[
+              { value: '', label: 'Todos los meses' },
+              ...MONTH_OPTIONS.map((mo) => ({ value: mo, label: cap1(mo) })),
+            ]}
+          />
+          <SelectField
+            label="Temperatura"
+            value={f.temp}
+            onChange={setParam('temp')}
+            options={options('Toda temperatura', TEMPERATURES, TEMPERATURE_LABELS)}
+          />
+          <SelectField
+            label="Estado de envío"
+            value={f.send}
+            onChange={setParam('send')}
+            options={options('Todo estado de envío', SEND_STATUSES, SEND_STATUS_LABELS)}
           />
         </div>
       </div>
 
-      <div className="filters-bar">
-        <div className="chip-tabs" role="group" aria-label="Filtrar por estado">
-          <button
-            type="button"
-            className={!status ? 'active' : ''}
-            aria-pressed={!status}
-            onClick={() => setParam('status', undefined)}
-          >
-            Todas
-          </button>
-          {QUOTE_STATUSES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={status === s ? 'active' : ''}
-              aria-pressed={status === s}
-              onClick={() => setParam('status', s)}
-            >
-              {QUOTE_STATUS_LABELS[s]}
-            </button>
-          ))}
-        </div>
-        <div className="actions">
-          <label className="search-input" style={{ margin: 0, minWidth: 240 }}>
-            <Search size={15} />
-            <input
-              value={q}
-              placeholder="Cliente, proyecto u OT…"
-              aria-label="Buscar"
-              onChange={(e) => setParam('q', e.target.value || undefined)}
-            />
-          </label>
-          <select
-            className="input"
-            style={{ width: 'auto', borderRadius: 999 }}
-            value={businessUnit ?? ''}
-            aria-label="Filtrar por unidad"
-            onChange={(e) => setParam('unit', e.target.value || undefined)}
-          >
-            <option value="">Todas las unidades</option>
-            {BUSINESS_UNITS.map((u) => (
-              <option key={u} value={u}>
-                {BUSINESS_UNIT_LABELS[u]}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <section className="card">
-        {isLoading ? <div className="empty">Cargando…</div> : null}
+      <QuoteList>
+        {isLoading ? <p className="body gyg-muted gyg-empty">Cargando…</p> : null}
         {error ? <div className="alert danger">{errorMessage(error)}</div> : null}
-        {quotes && quotes.length === 0 ? (
-          <div className="empty">
-            No hay cotizaciones{q || status || businessUnit ? ' con esos filtros' : ''}. Si vienes del
-            cotizador anterior, usa "Importar respaldo" con el archivo de "Exportar todas (respaldo)".
-          </div>
+        {quotes && shown.length === 0 ? (
+          <p className="body gyg-muted gyg-empty">
+            {rows.length === 0
+              ? 'Aún no hay cotizaciones. Si vienes del cotizador anterior, usa "Importar respaldo".'
+              : 'Ninguna cotización coincide con los filtros.'}
+          </p>
         ) : null}
-        <div className="list">
-          {quotes?.map((x) => (
-            <QuoteRow
-              key={x.id}
-              q={x}
-              today={today}
-              onStatus={(s) =>
+        {shown.map((q) => {
+          const overdue = !!q.nextFollowUp && q.nextFollowUp <= today && (q.status === 'sent' || q.status === 'negotiating');
+          return (
+            <QuoteCard
+              key={q.id}
+              href={`/quotes/${q.id}`}
+              client={q.clientName}
+              identification={q.identification}
+              project={q.projectName}
+              type={TRANSACTION_TYPE_LABELS[q.transactionType]}
+              code={q.number}
+              date={q.issueDate}
+              age={`hace ${daysBetween(q.issueDate, today)} d`}
+              unit={q.businessUnit ? BUSINESS_UNIT_LABELS[q.businessUnit] : null}
+              service={q.serviceType ? SERVICE_TYPE_LABELS[q.serviceType] : null}
+              contactName={q.contactName}
+              phone={q.contactPhone}
+              phone2={q.contactPhone2}
+              status={toGygStatus(q.status)}
+              stage={q.stage}
+              temperature={q.temperature}
+              sendStatus={q.sendStatus}
+              closeDate={q.closeDate}
+              due={
+                q.nextFollowUp
+                  ? { label: overdue ? `Vencido · ${q.nextFollowUp}` : `Seguimiento ${q.nextFollowUp}`, overdue }
+                  : null
+              }
+              note={q.note}
+              total={q.total}
+              onStatusChange={(s) =>
                 m.setStatus.mutate(
-                  { id: x.id, change: { status: s } },
+                  { id: q.id, change: { status: fromGygStatus(s) } },
                   { onError: (e) => notify(errorMessage(e), true) },
                 )
               }
-              onDuplicate={() =>
-                m.duplicate.mutate(x.id, {
-                  onSuccess: (dup) => {
-                    notify(`Duplicada como ${dup.number}`);
-                    navigate(`/quotes/${dup.id}`);
-                  },
-                  onError: (e) => notify(errorMessage(e), true),
-                })
-              }
-              onSupersede={async () => {
-                const ok = await confirm({
-                  title: `¿Sustituir la ${x.number}?`,
-                  message:
-                    'Se crea una cotización nueva con número propio para el nuevo requerimiento. La actual queda como Sustituida y vinculada a la nueva.',
-                  details: (
-                    <>
-                      <div>{x.clientName || '(sin cliente)'}</div>
-                      {x.projectName ? <div className="muted">{x.projectName}</div> : null}
-                      <div className="muted">
-                        {QUOTE_STATUS_LABELS[x.status]} · {formatCop(x.total)}
-                      </div>
-                    </>
-                  ),
-                  confirmLabel: 'Crear sustitución',
-                  cancelLabel: 'Cancelar',
-                });
-                if (!ok) return;
-                m.supersede.mutate(x.id, {
-                  onSuccess: (dup) => {
-                    notify(`La ${x.number} quedó sustituida por ${dup.number}`);
-                    navigate(`/quotes/${dup.id}`);
-                  },
-                  onError: (e) => notify(errorMessage(e), true),
-                });
-              }}
-              onDelete={async () => {
-                const ok = await confirm({
-                  title: `¿Eliminar la ${x.number}?`,
-                  message:
-                    'Dejará de aparecer en el listado y en los indicadores. Queda guardada para auditoría.',
-                  details: (
-                    <>
-                      <div>{x.clientName || '(sin cliente)'}</div>
-                      {x.projectName ? <div className="muted">{x.projectName}</div> : null}
-                      <div className="muted">
-                        {QUOTE_STATUS_LABELS[x.status]} · {formatCop(x.total)}
-                      </div>
-                    </>
-                  ),
-                  confirmLabel: 'Eliminar cotización',
-                  tone: 'danger',
-                });
-                if (!ok) return;
-                m.remove.mutate(x.id, { onError: (e) => notify(errorMessage(e), true) });
-              }}
-              onAnalysis={() =>
-                downloadFrom(`/api/quotes/${x.id}/cost-analysis.xlsx`, 'analisis.xlsx').catch((e) =>
-                  notify(errorMessage(e), true),
-                )
+              onAction={(k) => void onAction(q, k)}
+              extraActions={
+                <>
+                  <Button
+                    variant="secondary"
+                    disabled={!!q.supersededByNumber}
+                    title={q.supersededByNumber ? `Ya fue sustituida por ${q.supersededByNumber}` : undefined}
+                    onClick={() => void supersede(q)}
+                  >
+                    {q.supersededByNumber ? `Sustituida por ${q.supersededByNumber}` : 'Sustituir'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() =>
+                      downloadFrom(`/api/quotes/${q.id}/cost-analysis.xlsx`, 'analisis.xlsx').catch((e) =>
+                        notify(errorMessage(e), true),
+                      )
+                    }
+                  >
+                    Análisis de costos (Excel)
+                  </Button>
+                  <Button variant="secondary" onClick={() => navigate(`/quotes/${q.id}`)}>
+                    Abrir editor completo
+                  </Button>
+                </>
               }
             />
-          ))}
-        </div>
-      </section>
-    </>
-  );
-}
+          );
+        })}
+      </QuoteList>
 
-function QuoteRow({
-  q,
-  today,
-  onStatus,
-  onDuplicate,
-  onSupersede,
-  onDelete,
-  onAnalysis,
-}: {
-  q: QuoteSummary;
-  today: string;
-  onStatus: (s: QuoteStatus) => void;
-  onDuplicate: () => void;
-  onSupersede: () => void;
-  onDelete: () => void;
-  onAnalysis: () => void;
-}) {
-  const days = daysBetween(q.issueDate, today);
-  const s = STATUS_STYLE[q.status];
-  const overdue = q.nextFollowUp && q.nextFollowUp <= today;
-  const classification = [
-    q.businessUnit ? BUSINESS_UNIT_LABELS[q.businessUnit] : null,
-    q.serviceType ? SERVICE_TYPE_LABELS[q.serviceType] : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  return (
-    <div className="list-item">
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <Link to={`/quotes/${q.id}`} style={{ fontWeight: 600, fontSize: 14.5 }}>
-            {q.clientName || '(sin cliente)'}
-          </Link>
-          <select
-            aria-label={`Estado de ${q.number}`}
-            className="status-select"
-            value={q.status}
-            style={{ background: s.bg, color: s.fg }}
-            onChange={(e) => onStatus(e.target.value as QuoteStatus)}
-          >
-            {QUOTE_STATUSES.map((v) => (
-              <option key={v} value={v}>
-                {QUOTE_STATUS_LABELS[v]}
-              </option>
-            ))}
-          </select>
-          {q.nextFollowUp ? (
-            <span className="hint" style={{ color: overdue ? 'var(--danger)' : undefined }}>
-              Seguimiento {q.nextFollowUp}
-            </span>
-          ) : null}
-        </div>
-        <div style={{ color: 'var(--text-2)', fontSize: 13, margin: '3px 0' }}>{q.projectName || '—'}</div>
-        <div className="meta">
-          {q.number} · {q.issueDate} (hace {days} d)
-          {classification ? ` · ${classification}` : ''}
-        </div>
-        {q.supersededByNumber || q.supersedesNumber ? (
-          <div className="meta" style={{ marginTop: 2 }}>
-            {q.supersededByNumber ? (
-              <>
-                Sustituida por{' '}
-                <Link to={`/quotes?q=${encodeURIComponent(q.supersededByNumber)}`}>
-                  {q.supersededByNumber}
-                </Link>
-              </>
-            ) : null}
-            {q.supersededByNumber && q.supersedesNumber ? ' · ' : null}
-            {q.supersedesNumber ? (
-              <>
-                Sustituye a{' '}
-                <Link to={`/quotes?q=${encodeURIComponent(q.supersedesNumber)}`}>{q.supersedesNumber}</Link>
-              </>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-      <div
-        style={{
-          fontFamily: 'var(--mono)',
-          fontSize: 15,
-          fontWeight: 600,
-          minWidth: 130,
-          textAlign: 'right',
-        }}
-      >
-        {formatCop(q.total)}
-      </div>
-      <div className="actions">
-        <Link className="btn small" to={`/quotes/${q.id}/offer`} title="Ver oferta para el cliente">
-          <FileText size={14} /> Oferta
-        </Link>
-        <button
-          type="button"
-          className="icon-btn sm"
-          onClick={onAnalysis}
-          title="Análisis de costos (Excel)"
-          aria-label={`Análisis de costos de ${q.number}`}
-        >
-          <FileSpreadsheet size={15} />
-        </button>
-        <button
-          type="button"
-          className="icon-btn sm"
-          onClick={onSupersede}
-          disabled={!!q.supersededByNumber}
-          title={
-            q.supersededByNumber
-              ? `Ya fue sustituida por ${q.supersededByNumber}`
-              : 'Sustituir con un nuevo requerimiento'
-          }
-          aria-label={`Sustituir ${q.number}`}
-        >
-          <ArrowRightLeft size={15} />
-        </button>
-        <button
-          type="button"
-          className="icon-btn sm"
-          onClick={onDuplicate}
-          title="Duplicar"
-          aria-label={`Duplicar ${q.number}`}
-        >
-          <Copy size={15} />
-        </button>
-        <button
-          type="button"
-          className="icon-btn sm ghost-danger"
-          onClick={onDelete}
-          title="Eliminar"
-          aria-label={`Eliminar ${q.number}`}
-        >
-          <Trash2 size={15} />
-        </button>
-      </div>
+      {editing ? (
+        <QuoteFormPanel
+          quote={editing.quote}
+          total={editing.total}
+          saving={saving} onSave={(v) => void saveForm(v)} onCancel={() => setEditing(null)} />
+      ) : null}
     </div>
   );
 }

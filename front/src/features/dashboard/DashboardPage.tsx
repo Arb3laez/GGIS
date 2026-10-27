@@ -229,8 +229,8 @@ export function DashboardPage() {
             Auditoría de proyectos en ejecución
           </h2>
           <div className="sub">
-            {d.inExecution} adjudicado{d.inExecution === 1 ? '' : 's'} sin cerrar. Se listan los que ya
-            consumieron más del 60% del presupuesto.
+            {d.inExecution} proyecto{d.inExecution === 1 ? '' : 's'} sin cerrar (adjudicados y en negociación
+            con costos registrados). Se listan los que ya consumieron más del 60% del presupuesto.
           </div>
           {d.atRisk.length === 0 ? (
             <div className="hint">Ningún proyecto en ejecución ha superado el 60% de su presupuesto.</div>

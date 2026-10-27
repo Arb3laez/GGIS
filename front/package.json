@@ -11,9 +11,12 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
+    "@fontsource/manrope": "^5.3.0",
     "@ggis/domain": "*",
     "@tanstack/react-query": "^5.62.11",
+    "html-to-image": "^1.11.13",
     "immer": "^10.1.1",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

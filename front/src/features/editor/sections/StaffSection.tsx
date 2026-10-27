@@ -15,7 +15,7 @@ import {
 } from '@ggis/domain';
 import { Combine, HardHat } from 'lucide-react';
 import { useToast } from '../../../shared/feedback';
-import { Checkbox, NumberInput } from '../../../shared/inputs';
+import { Checkbox, formatPesos, NumberInput } from '../../../shared/inputs';
 import { SectionTitle } from '../../../shared/SectionTitle';
 import { useBreakdown, useDraft, useEdit } from '../store';
 
@@ -266,6 +266,7 @@ function StaffRows({
           <NumberInput
             value={m.monthlySalary}
             ariaLabel="Salario mensual"
+            format={formatPesos}
             onChange={(n) => onEdit((x) => void (x.monthlySalary = n ?? 0))}
           />
         </td>

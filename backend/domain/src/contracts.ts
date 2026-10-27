@@ -1,4 +1,12 @@
-import type { BusinessUnit, LossReason, QuoteStatus, ServiceType } from './constants';
+import type {
+  BusinessUnit,
+  LossReason,
+  QuoteStatus,
+  SendStatus,
+  ServiceType,
+  Temperature,
+  TransactionType,
+} from './constants';
 import type { ImportedRow } from './schemas';
 
 /**
@@ -11,6 +19,18 @@ export interface QuoteSummary {
   number: string;
   clientName: string;
   projectName: string;
+  /** Contacto del cliente y su teléfono (para el listado tipo CRM). */
+  contactName: string;
+  contactPhone: string;
+  contactPhone2: string;
+  /** NIT / CC del cliente. */
+  identification: string;
+  transactionType: TransactionType;
+  temperature: Temperature | null;
+  sendStatus: SendStatus | null;
+  closeDate: string | null;
+  /** Observación del seguimiento. */
+  note: string;
   issueDate: string;
   validDays: number;
   status: QuoteStatus;
@@ -18,6 +38,9 @@ export interface QuoteSummary {
   serviceType: ServiceType | null;
   lossReason: LossReason | null;
   nextFollowUp: string | null;
+  /** Etapa del seguimiento comercial y desde cuándo está en ella. */
+  stage: string | null;
+  stageUpdatedOn: string | null;
   /** Total de la oferta (con IVA/AIU). */
   total: number;
   /** Costo total presupuestado. */
