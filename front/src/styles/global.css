@@ -1946,3 +1946,13 @@ button.danger:hover:not(:disabled) {
   gap: 6px;
   flex-wrap: wrap;
 }
+
+/* Oferta en modo edición de textos */
+.offer-editing {
+  outline: none;
+  cursor: text;
+}
+.offer-editing .pp-page {
+  outline: 2px dashed var(--accent);
+  outline-offset: 3px;
+}

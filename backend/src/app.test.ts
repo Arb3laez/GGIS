@@ -242,6 +242,23 @@ describe('cotizaciones', () => {
       .expect(404);
   });
 
+  it('guarda la oferta editada a mano y la copia no la hereda', async () => {
+    const q = await createQuote();
+    const { id: _i, number: _n, version, createdAt: _c, updatedAt: _u, ...draft } = q;
+    const offerOverride = {
+      html: '<section>Texto editado</section>',
+      editedAt: '2026-10-31T10:00:00.000Z',
+      version: 2,
+    };
+    const saved = await request(app)
+      .put(`/api/quotes/${q.id}`)
+      .send({ version, quote: { ...draft, offerOverride } })
+      .expect(200);
+    expect(saved.body.offerOverride).toEqual(offerOverride);
+    const dup = await request(app).post(`/api/quotes/${q.id}/duplicate`).expect(201);
+    expect(dup.body.offerOverride).toBeNull();
+  });
+
   it('duplica con número nuevo y borra lógicamente', async () => {
     const q = await createQuote();
     const dup = await request(app).post(`/api/quotes/${q.id}/duplicate`).expect(201);

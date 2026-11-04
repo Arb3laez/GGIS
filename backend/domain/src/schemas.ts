@@ -209,9 +209,7 @@ export const clientResearchSchema = z.object({
   imageTheme: z.enum(FACILITY_KINDS),
   sources: z.array(z.object({ title: text(300), url: z.string().url().max(2_000) })).max(15),
   /** Descripciones para generar las imágenes alusivas con IA (editables). */
-  imagePrompts: z
-    .object({ need: text(1_000), solution: text(1_000) })
-    .default({ need: '', solution: '' }),
+  imagePrompts: z.object({ need: text(1_000), solution: text(1_000) }).default({ need: '', solution: '' }),
   /** Imágenes generadas con IA (adjuntos de la cotización); null = se usa la biblioteca G&G. */
   images: z
     .object({ need: z.string().uuid().nullable(), solution: z.string().uuid().nullable() })
@@ -298,6 +296,14 @@ export const quoteDraftSchema = z.object({
   followUp: followUpSchema.default({}),
   /** Investigación comercial del cliente (null = aún sin investigar). */
   research: clientResearchSchema.nullable().default(null),
+  /**
+   * Oferta con textos editados a mano antes de enviarla (HTML del documento). null = la oferta se
+   * arma siempre desde la cotización. `version` es la versión de la cotización en que se editó.
+   */
+  offerOverride: z
+    .object({ html: z.string().max(3_000_000), editedAt: z.string().max(40), version: z.number().int() })
+    .nullable()
+    .default(null),
   client: clientSchema,
   businessUnit: businessUnitSchema.nullable(),
   serviceType: serviceTypeSchema.nullable().default(null),

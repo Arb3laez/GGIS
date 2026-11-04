@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import DOMPurify from 'dompurify';
 import { Link, useParams } from 'react-router-dom';
 import {
   BUSINESS_UNIT_LABELS,
@@ -10,7 +12,9 @@ import {
   type Quote,
 } from '@ggis/domain';
 import { downloadFrom, saveBlob } from '../../api/http';
-import { useCompanyProfile, useQuote } from '../../api/queries';
+import { keys, quotesApi, useCompanyProfile, useQuote } from '../../api/queries';
+import { useConfirm } from '../../shared/confirm';
+import { quoteToDraft } from '../editor/store';
 import {
   ArrowLeft,
   ChevronDown,
@@ -22,7 +26,11 @@ import {
   FolderSync,
   Image,
   Mail,
+  Pencil,
   Printer,
+  RotateCcw,
+  Save,
+  X,
 } from 'lucide-react';
 import { errorMessage, useToast } from '../../shared/feedback';
 import { attachmentUrl } from '../../shared/LibraryImage';
@@ -108,6 +116,12 @@ export function OfferPage() {
   const [downloadsOpen, setDownloadsOpen] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const downloadsRef = useRef<HTMLDivElement>(null);
+  const qc = useQueryClient();
+  const confirm = useConfirm();
+  /** HTML con el que arranca la edición (null = no se está editando). */
+  const [editHtml, setEditHtml] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
+  const editRef = useRef<HTMLDivElement>(null);
 
   // El menú de descargas se cierra al hacer clic fuera o con Escape.
   useEffect(() => {
@@ -128,6 +142,52 @@ export function OfferPage() {
   if (!quote || !company) return <div className="empty">Cargando oferta…</div>;
 
   const baseName = `Propuesta ${quote.number} - ${safeFileName(quote.client.name)}`;
+  const override = quote.offerOverride;
+  const editing = editHtml !== null;
+  // La cotización cambió después de editar la oferta: esos cambios no se ven en la versión editada.
+  const overrideStale = !!override && quote.version > override.version;
+
+  /** HTML del documento sin la hoja de estilos (se guarda solo el contenido). */
+  function currentDocHtml(): string {
+    const doc = docRef.current?.querySelector('.proposal-doc')?.cloneNode(true) as HTMLElement | undefined;
+    if (!doc) return '';
+    doc.querySelector('style')?.remove();
+    return doc.innerHTML;
+  }
+
+  const clean = (html: string) =>
+    DOMPurify.sanitize(html, { FORBID_TAGS: ['style', 'script', 'iframe', 'form'] });
+
+  /** Guarda (o quita, con null) la versión editada de la oferta en la cotización. */
+  async function saveOverride(html: string | null) {
+    if (!quote) return;
+    setSavingEdit(true);
+    try {
+      const draft = quoteToDraft(quote);
+      draft.offerOverride = html
+        ? { html: clean(html), editedAt: new Date().toISOString(), version: quote.version + 1 }
+        : null;
+      const saved = await quotesApi.update(quote.id, quote.version, draft);
+      qc.setQueryData(keys.quote(saved.id), saved);
+      void qc.invalidateQueries({ queryKey: keys.quotes, refetchType: 'inactive' });
+      setEditHtml(null);
+      notify(html ? '✓ Cambios de la oferta guardados' : '✓ Oferta restablecida desde la cotización');
+    } catch (err) {
+      notify(`No se pudo guardar: ${errorMessage(err)}`, true);
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function restoreOriginal() {
+    const ok = await confirm({
+      title: '¿Volver a la oferta original?',
+      message: 'Se pierden los textos que editaste a mano y la oferta se arma de nuevo desde la cotización.',
+      confirmLabel: 'Volver a la original',
+      cancelLabel: 'Cancelar',
+    });
+    if (ok) await saveOverride(null);
+  }
 
   /**
    * Imprime únicamente el documento de la propuesta en una ventana limpia.
@@ -251,72 +311,118 @@ export function OfferPage() {
           </Link>
           <h1>Propuesta comercial</h1>
         </div>
-        <div className="toolbar">
-          <button type="button" onClick={() => setEmail(emailDraft(quote, company))}>
-            <Mail size={16} /> Preparar correo
-          </button>
-          <button type="button" onClick={() => void dropboxPackage()}>
-            <FolderSync size={16} /> Paquete Dropbox
-          </button>
-          <div className="menu-wrap" ref={downloadsRef}>
+        {editing ? (
+          <div className="toolbar">
+            <button type="button" disabled={savingEdit} onClick={() => setEditHtml(null)}>
+              <X size={16} /> Cancelar
+            </button>
             <button
               type="button"
-              aria-haspopup="menu"
-              aria-expanded={downloadsOpen}
-              disabled={pdfBusy}
-              onClick={() => setDownloadsOpen((o) => !o)}
+              className="primary"
+              disabled={savingEdit}
+              onClick={() => void saveOverride(editRef.current?.innerHTML ?? '')}
             >
-              <Download size={16} /> {pdfBusy ? 'Generando PDF…' : 'Descargas'} <ChevronDown size={14} />
+              <Save size={16} /> {savingEdit ? 'Guardando…' : 'Guardar cambios'}
             </button>
-            {downloadsOpen ? (
-              <div className="menu" role="menu">
-                <button type="button" role="menuitem" onClick={() => void download(downloadPdf)}>
-                  <FileDown size={15} /> Oferta en PDF
-                </button>
-                <button type="button" role="menuitem" onClick={() => void download(downloadHtml)}>
-                  <FileCode size={15} /> Oferta en HTML
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() =>
-                    void download(() =>
-                      downloadFrom(
-                        `/api/quotes/${quote.id}/cost-analysis.xlsx`,
-                        `${baseName} - análisis.xlsx`,
-                      ),
-                    )
-                  }
-                >
-                  <FileSpreadsheet size={15} /> Análisis de costos (Excel)
-                </button>
-                {aiImages.map((img) => (
+          </div>
+        ) : (
+          <div className="toolbar">
+            <button
+              type="button"
+              title="Cambia palabras o frases de la oferta directamente sobre el documento"
+              onClick={() => setEditHtml(override ? clean(override.html) : currentDocHtml())}
+            >
+              <Pencil size={16} /> Editar textos
+            </button>
+            <button type="button" onClick={() => setEmail(emailDraft(quote, company))}>
+              <Mail size={16} /> Preparar correo
+            </button>
+            <button type="button" onClick={() => void dropboxPackage()}>
+              <FolderSync size={16} /> Paquete Dropbox
+            </button>
+            <div className="menu-wrap" ref={downloadsRef}>
+              <button
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={downloadsOpen}
+                disabled={pdfBusy}
+                onClick={() => setDownloadsOpen((o) => !o)}
+              >
+                <Download size={16} /> {pdfBusy ? 'Generando PDF…' : 'Descargas'} <ChevronDown size={14} />
+              </button>
+              {downloadsOpen ? (
+                <div className="menu" role="menu">
+                  <button type="button" role="menuitem" onClick={() => void download(downloadPdf)}>
+                    <FileDown size={15} /> Oferta en PDF
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => void download(downloadHtml)}>
+                    <FileCode size={15} /> Oferta en HTML
+                  </button>
                   <button
-                    key={img.id}
                     type="button"
                     role="menuitem"
                     onClick={() =>
                       void download(() =>
-                        downloadFrom(attachmentUrl(img.id), `${baseName} - ${img.name}.jpg`),
+                        downloadFrom(
+                          `/api/quotes/${quote.id}/cost-analysis.xlsx`,
+                          `${baseName} - análisis.xlsx`,
+                        ),
                       )
                     }
                   >
-                    <Image size={15} /> {img.label}
+                    <FileSpreadsheet size={15} /> Análisis de costos (Excel)
                   </button>
-                ))}
-              </div>
-            ) : null}
+                  {aiImages.map((img) => (
+                    <button
+                      key={img.id}
+                      type="button"
+                      role="menuitem"
+                      onClick={() =>
+                        void download(() =>
+                          downloadFrom(attachmentUrl(img.id), `${baseName} - ${img.name}.jpg`),
+                        )
+                      }
+                    >
+                      <Image size={15} /> {img.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className="primary"
+              onClick={printProposal}
+              title="Se abre una ventana solo con la propuesta; elige 'Guardar como PDF'"
+            >
+              <Printer size={16} /> Imprimir / PDF
+            </button>
           </div>
+        )}
+      </div>
+
+      {editing ? (
+        <div className="alert info no-print">
+          Modo edición: haz clic sobre cualquier texto de la oferta y escríbelo como en un documento. Al
+          terminar pulsa <b>Guardar cambios</b>. Los cambios quedan solo en esta oferta; la cotización no
+          cambia.
+        </div>
+      ) : override ? (
+        <div className={overrideStale ? 'alert warning no-print' : 'alert info no-print'}>
+          Esta oferta tiene textos editados a mano ({new Date(override.editedAt).toLocaleString('es-CO')}).
+          {overrideStale
+            ? ' La cotización cambió después: esos cambios (precios, ítems, investigación) no se ven aquí hasta que vuelvas a la oferta original.'
+            : ' Si cambias la cotización, vuelve a la oferta original para verlos.'}{' '}
           <button
             type="button"
-            className="primary"
-            onClick={printProposal}
-            title="Se abre una ventana solo con la propuesta; elige 'Guardar como PDF'"
+            className="small"
+            disabled={savingEdit}
+            onClick={() => void restoreOriginal()}
           >
-            <Printer size={16} /> Imprimir / PDF
+            <RotateCcw size={13} /> Volver a la oferta original
           </button>
         </div>
-      </div>
+      ) : null}
 
       {dropboxPath ? (
         <div className="alert info no-print">
@@ -387,7 +493,26 @@ export function OfferPage() {
       ) : null}
 
       <div ref={docRef} className="offer-frame">
-        <ProposalDocument quote={quote} company={company} />
+        {editing ? (
+          <>
+            <style>{proposalCss}</style>
+            <div
+              ref={editRef}
+              className="proposal-doc offer-editing"
+              contentEditable
+              suppressContentEditableWarning
+              spellCheck
+              dangerouslySetInnerHTML={{ __html: editHtml }}
+            />
+          </>
+        ) : override ? (
+          <div className="proposal-doc">
+            <style>{proposalCss}</style>
+            <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: clean(override.html) }} />
+          </div>
+        ) : (
+          <ProposalDocument quote={quote} company={company} />
+        )}
       </div>
     </div>
   );

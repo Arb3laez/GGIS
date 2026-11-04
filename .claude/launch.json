@@ -22,6 +22,21 @@
         "API_PORT": "4100",
         "DATA_DIR": "C:\\Users\\DIEGOA~1\\AppData\\Local\\Temp\\claude\\C--Users-DiegoArbel-ez-Proyectos-Cotizador-GyG\\49ea92b4-6a7d-4606-9921-2093195df87b\\scratchpad\\demo-data"
       }
+    },
+    {
+      "name": "cotizador-demo-5174",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "concurrently",
+        "-k",
+        "npm run dev -w @ggis/backend",
+        "npm run dev -w @ggis/front -- --port 5174"
+      ],
+      "port": 5174,
+      "env": {
+        "API_PORT": "4100",
+        "DATA_DIR": "C:\\Users\\DIEGOA~1\\AppData\\Local\\Temp\\claude\\C--Users-DiegoArbel-ez-Proyectos-Cotizador-GyG\\49ea92b4-6a7d-4606-9921-2093195df87b\\scratchpad\\demo-data"
+      }
     }
   ]
 }
