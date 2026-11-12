@@ -57,6 +57,44 @@ function warrantyLabel(text: string): string {
   return `${years} año${years === '1' ? '' : 's'}`;
 }
 
+/** Bloque de texto de las condiciones de la oferta (lo que se escribe en "Condiciones de la oferta"). */
+interface TermsBlock {
+  title: string;
+  text: string;
+}
+
+/**
+ * Reparte los textos de condiciones en páginas A4 según su largo (la página no crece: lo que no
+ * cabe se cortaría). Un texto muy largo se parte por párrafos o frases y sigue en la página siguiente.
+ */
+export function paginateTerms(blocks: TermsBlock[], firstBudget = 2_600, nextBudget = 4_200): TermsBlock[][] {
+  const pages: TermsBlock[][] = [[]];
+  let left = firstBudget;
+  const HEADING = 120; // lo que "ocupa" el título de cada bloque
+  for (const block of blocks) {
+    const pieces = block.text.split(/(?<=\n)|(?<=\.\s)/);
+    let current = '';
+    let title = block.title;
+    const flush = () => {
+      if (!current.trim()) return;
+      pages[pages.length - 1]!.push({ title, text: current.trim() });
+      left -= current.length + HEADING;
+      current = '';
+      title = `${block.title} (continuación)`;
+    };
+    for (const piece of pieces) {
+      if (current.length + piece.length + HEADING > left && (current || pages[pages.length - 1]!.length)) {
+        flush();
+        pages.push([]);
+        left = nextBudget;
+      }
+      current += piece;
+    }
+    flush();
+  }
+  return pages.filter((pg) => pg.length > 0);
+}
+
 function PageHead({ left, right }: { left: string; right: string }) {
   return (
     <div className="pp-ph">
@@ -107,7 +145,17 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
   const unitLine = [unitLabel, serviceLabel].filter(Boolean).join(' · ') || 'Solución integral';
   const validUntil = formatLongDate(addDaysIso(q.issueDate, q.validDays));
   const itemPages = billable.length ? chunk(billable, ITEMS_PER_PAGE) : [[]];
-  const totalPages = 5 + itemPages.length;
+  // Textos de "Condiciones de la oferta" del editor: van en su propia página antes del cierre.
+  const termsPages = paginateTerms(
+    [
+      { title: 'Alcance del suministro', text: q.terms.scope },
+      { title: 'Garantía', text: q.terms.warranty },
+      { title: 'Exclusiones y comentarios', text: q.terms.exclusions },
+      { title: 'Condiciones generales', text: q.terms.generalConditions },
+    ].filter((b) => b.text.trim()),
+  );
+  const totalPages = 5 + itemPages.length + termsPages.length;
+  const closingNo = termsPages.length ? '06' : '05';
   const p = q.pricing;
 
   const signerName = company.signatoryName || company.legalName || company.tradeName;
@@ -495,11 +543,57 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
         </div>
       </section>
 
-      {/* 06 · CIERRE */}
+      {/* 06 · ALCANCE Y CONDICIONES (una o varias páginas, solo si hay textos) */}
+      {termsPages.map((blocks, i) => (
+        <section className="pp-page" key={`terms-${i}`}>
+          <div className="pp-pad">
+            <PageHead left="Condiciones" right="05 / Alcance y condiciones" />
+            {i === 0 ? (
+              <>
+                <SectionHead number="05" title="Alcance y condiciones de la oferta" />
+                <div className="pp-terms-facts">
+                  <div>
+                    <div className="k">Equipos nacionales</div>
+                    <div className="v">{q.terms.deliveryNational || 'Según disponibilidad'}</div>
+                  </div>
+                  <div>
+                    <div className="k">Importación</div>
+                    <div className="v">{q.terms.deliveryImport || 'Según disponibilidad'}</div>
+                  </div>
+                  <div>
+                    <div className="k">Instalación</div>
+                    <div className="v">{installation}</div>
+                  </div>
+                  <div>
+                    <div className="k">Forma de pago</div>
+                    <div className="v">
+                      {paymentParts.length
+                        ? paymentParts.map((x) => `${x.label} ${x.pct}%`).join(' · ')
+                        : PAYMENT_MODE_LABELS[q.terms.paymentMode]}
+                      {q.terms.financingDays > 0 ? ` · ${q.terms.financingDays} días` : ''}
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : null}
+            <div className="pp-terms">
+              {blocks.map((b) => (
+                <div key={b.title}>
+                  <h3>{b.title}</h3>
+                  <p>{b.text}</p>
+                </div>
+              ))}
+            </div>
+            <PageFooter page={5 + itemPages.length + i} total={totalPages} number={q.number} />
+          </div>
+        </section>
+      ))}
+
+      {/* 07 · CIERRE */}
       <section className="pp-page pp-last">
         <div className="pp-pad">
-          <PageHead left="Condiciones" right="05 / Cierre" />
-          <SectionHead number="05" title={content.closingTitle} />
+          <PageHead left="Condiciones" right={`${closingNo} / Cierre`} />
+          <SectionHead number={closingNo} title={content.closingTitle} />
           <p className="pp-intro">{content.closingIntro}</p>
 
           <div className="pp-cards3">
@@ -562,7 +656,7 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
           </div>
 
           <div className="pp-thanks">Proteger la operación empieza por una decisión clara.</div>
-          <PageFooter page={5 + itemPages.length} total={totalPages} number={q.number} />
+          <PageFooter page={5 + itemPages.length + termsPages.length} total={totalPages} number={q.number} />
         </div>
       </section>
     </div>

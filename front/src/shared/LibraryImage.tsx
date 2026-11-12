@@ -50,6 +50,22 @@ export function photoCredit(research: ClientResearch | null, slot: ResearchImage
   return (id && research?.photos.find((p) => p.attachmentId === id)?.credit) || '';
 }
 
+/**
+ * En HTML copiado fuera de React, la imagen no tiene su manejador de error: este listener (en fase
+ * de captura, porque el evento "error" no sube) pasa a la siguiente candidata de data-candidates.
+ */
+export function attachImageFallback(root: HTMLElement): () => void {
+  const onError = (e: Event) => {
+    const img = e.target;
+    if (!(img instanceof HTMLImageElement)) return;
+    const list = (img.dataset.candidates ?? '').split('|').filter(Boolean);
+    const next = list[list.indexOf(img.getAttribute('src') ?? '') + 1];
+    if (next) img.setAttribute('src', next);
+  };
+  root.addEventListener('error', onError, true);
+  return () => root.removeEventListener('error', onError, true);
+}
+
 /** Imagen que prueba cada candidata en orden hasta encontrar una que exista. */
 export function LibraryImage({
   candidates,
@@ -69,6 +85,8 @@ export function LibraryImage({
       className={className}
       src={src}
       alt={alt}
+      // Para copias del documento fuera de React (oferta con textos editados): ver useImageFallback.
+      data-candidates={candidates.join('|')}
       onError={() => setIndex((i) => (i < candidates.length - 1 ? i + 1 : i))}
     />
   );

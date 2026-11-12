@@ -621,8 +621,7 @@ const GENERIC: UnitProposalContent = {
       text: 'Configuración, pruebas, documentación y capacitación.',
     },
   ],
-  delivery:
-    'Acta de entrega, inventario, pruebas de funcionamiento, documentación y capacitación básica.',
+  delivery: 'Acta de entrega, inventario, pruebas de funcionamiento, documentación y capacitación básica.',
   checklist: [
     'Confirmar el alcance y las cantidades.',
     'Coordinar acceso y permisos del sitio.',
@@ -672,8 +671,9 @@ const CONTENT: Record<BusinessUnit, UnitProposalContent> = {
  */
 export function effectiveBusinessUnit(q: Quote): BusinessUnit | null {
   const text = [q.client.project, ...q.items.map((i) => i.description)].join(' ').toLowerCase();
-  const fire = (text.match(/incend|fuego|humo|detector|extinci|sirena|estaci[oó]n manual|facp|rociador/g) ?? [])
-    .length;
+  const fire = (
+    text.match(/incend|fuego|humo|detector|extinci|sirena|estaci[oó]n manual|facp|rociador/g) ?? []
+  ).length;
   const cctv = (text.match(/c[aá]mara|cctv|nvr|dvr|videovigil|domo|bala/g) ?? []).length;
   if (fire >= 2 && fire > cctv) return 'fire';
   if (cctv >= 2 && cctv > fire) return 'cctv';
@@ -682,7 +682,7 @@ export function effectiveBusinessUnit(q: Quote): BusinessUnit | null {
 
 export function proposalContent(q: Quote): UnitProposalContent {
   const unit = effectiveBusinessUnit(q);
-  return unit ? CONTENT[unit] ?? GENERIC : GENERIC;
+  return unit ? (CONTENT[unit] ?? GENERIC) : GENERIC;
 }
 
 export function describeItem(item: QuoteItem): string {

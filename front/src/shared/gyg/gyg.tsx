@@ -188,6 +188,8 @@ export function SearchField({
       <Icon name="search" />
       <input
         type="search"
+        spellCheck={false}
+        autoComplete="off"
         className="gyg-field__input body"
         value={value}
         placeholder={placeholder}

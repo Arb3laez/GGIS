@@ -127,6 +127,7 @@ export function createEmptyDraft(now: Date = new Date()): QuoteDraft {
     transactionType: 'quote',
     followUp: followUpSchema.parse({}),
     research: null,
+    offerEdits: null,
     offerOverride: null,
     client: {
       name: '',
@@ -202,6 +203,7 @@ export function duplicateDraft(source: QuoteDraft, now: Date = new Date()): Quot
     closure: empty.closure,
     // La oferta editada a mano lleva el número y los datos de la original: la copia arma la suya.
     offerOverride: null,
+    offerEdits: null,
     // Una copia normal no hereda los vínculos de sustitución; los pone el caso de uso "sustituir".
     supersedesNumber: null,
     supersededByNumber: null,

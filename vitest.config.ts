@@ -19,6 +19,14 @@ export default defineConfig({
           environment: 'node',
         },
       },
+      {
+        test: {
+          name: 'front',
+          root: './front',
+          include: ['src/**/*.test.ts'],
+          environment: 'jsdom',
+        },
+      },
     ],
   },
 });

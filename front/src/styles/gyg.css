@@ -51,7 +51,22 @@
   padding: 0 var(--space-4); border-radius: var(--radius-pill); background: var(--surface-card);
   border: 1px solid var(--border-control); color: var(--ink-muted);
 }
-.gyg-field:focus-within { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.gyg-field { transition: border-color .15s, box-shadow .15s; }
+/* Un solo anillo de foco en el contenedor (píldora); el input interno no dibuja el suyo. */
+.gyg-field:focus-within {
+  outline: none; border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus-ring) 22%, transparent);
+}
+.gyg-field:focus-within > .gyg-icon { color: var(--focus-ring); }
+.gyg-field__input:focus, .gyg-field__input:focus-visible { outline: none; box-shadow: none; }
+/* Botón "x" del buscador acorde al diseño (el nativo se ve tosco). */
+.gyg-field__input::-webkit-search-cancel-button {
+  -webkit-appearance: none; appearance: none; width: 18px; height: 18px; cursor: pointer;
+  border-radius: 50%; background: var(--ink-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.3 12.9-1.4 1.4L12 13.4l-2.9 2.9-1.4-1.4 2.9-2.9-2.9-2.9 1.4-1.4 2.9 2.9 2.9-2.9 1.4 1.4-2.9 2.9z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.3 12.9-1.4 1.4L12 13.4l-2.9 2.9-1.4-1.4 2.9-2.9-2.9-2.9 1.4-1.4 2.9 2.9 2.9-2.9 1.4 1.4-2.9 2.9z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.gyg-field__input::-webkit-search-cancel-button:hover { background: var(--ink); }
 .gyg-field__input {
   flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); outline: none; padding: 0;
   height: 100%; min-height: calc(var(--space-12) - 2px); appearance: none; -webkit-appearance: none;

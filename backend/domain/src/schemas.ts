@@ -297,8 +297,22 @@ export const quoteDraftSchema = z.object({
   /** Investigación comercial del cliente (null = aún sin investigar). */
   research: clientResearchSchema.nullable().default(null),
   /**
-   * Oferta con textos editados a mano antes de enviarla (HTML del documento). null = la oferta se
-   * arma siempre desde la cotización. `version` es la versión de la cotización en que se editó.
+   * Cambios de texto hechos a mano en la oferta: cada bloque cambiado (texto original → contenido
+   * nuevo) se vuelve a aplicar sobre la oferta armada desde la cotización, así un cambio de precio
+   * no borra las notas. null = sin cambios a mano.
+   */
+  offerEdits: z
+    .object({
+      edits: z
+        .array(z.object({ tag: text(20), from: z.string().max(20_000), html: z.string().max(200_000) }))
+        .max(500),
+      editedAt: z.string().max(40),
+    })
+    .nullable()
+    .default(null),
+  /**
+   * Formato antiguo (foto fija del HTML de la oferta). Se convierte a `offerEdits` al abrir la
+   * oferta y se borra al guardar.
    */
   offerOverride: z
     .object({ html: z.string().max(3_000_000), editedAt: z.string().max(40), version: z.number().int() })

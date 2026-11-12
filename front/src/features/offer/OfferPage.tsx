@@ -1,6 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import DOMPurify from 'dompurify';
 import { Link, useParams } from 'react-router-dom';
 import {
   BUSINESS_UNIT_LABELS,
@@ -33,7 +32,8 @@ import {
   X,
 } from 'lucide-react';
 import { errorMessage, useToast } from '../../shared/feedback';
-import { attachmentUrl } from '../../shared/LibraryImage';
+import { attachImageFallback, attachmentUrl } from '../../shared/LibraryImage';
+import { applyEdits, cleanHtml, diffEdits, parseFragment, unwrapDoc, type OfferEdit } from './offer-edits';
 import { ProposalDocument } from './ProposalDocument';
 import proposalCss from './proposal.css?raw';
 
@@ -121,7 +121,44 @@ export function OfferPage() {
   /** HTML con el que arranca la edición (null = no se está editando). */
   const [editHtml, setEditHtml] = useState<string | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
-  const editRef = useRef<HTMLDivElement>(null);
+  const editRef = useRef<HTMLDivElement | null>(null);
+  /** Oferta generada desde la cotización (oculta): base sobre la que se aplican los textos editados. */
+  const baseRef = useRef<HTMLDivElement>(null);
+  const [baseHtml, setBaseHtml] = useState('');
+  const shownRef = useRef<HTMLDivElement | null>(null);
+
+  // Cada vez que se arma la oferta desde la cotización, se toma su HTML como base.
+  useLayoutEffect(() => {
+    const doc = baseRef.current?.querySelector('.proposal-doc')?.cloneNode(true) as HTMLElement | undefined;
+    if (!doc) return;
+    doc.querySelector('style')?.remove();
+    setBaseHtml(doc.innerHTML);
+  }, [quote, company]);
+
+  // Cambios guardados; las ofertas editadas con el formato antiguo (foto fija) se convierten aquí.
+  const stored = useMemo((): { edits: OfferEdit[]; editedAt: string; legacy: boolean } | null => {
+    if (!quote || !baseHtml) return null;
+    if (quote.offerEdits) return { ...quote.offerEdits, legacy: false };
+    if (!quote.offerOverride) return null;
+    const edits = diffEdits(
+      parseFragment(baseHtml),
+      unwrapDoc(parseFragment(cleanHtml(quote.offerOverride.html))),
+      {
+        ignoreNumberChanges: true,
+      },
+    );
+    return { edits, editedAt: quote.offerOverride.editedAt, legacy: true };
+  }, [quote, baseHtml]);
+
+  /** Oferta final = la generada + los textos editados que todavía encuentran su lugar. */
+  const shown = useMemo(() => {
+    if (!stored || !baseHtml) return null;
+    const root = parseFragment(baseHtml);
+    const missed = applyEdits(root, stored.edits);
+    return { html: root.innerHTML, missed };
+  }, [stored, baseHtml]);
+
+  useEffect(() => (shownRef.current ? attachImageFallback(shownRef.current) : undefined), [shown, editHtml]);
 
   // El menú de descargas se cierra al hacer clic fuera o con Escape.
   useEffect(() => {
@@ -142,36 +179,24 @@ export function OfferPage() {
   if (!quote || !company) return <div className="empty">Cargando oferta…</div>;
 
   const baseName = `Propuesta ${quote.number} - ${safeFileName(quote.client.name)}`;
-  const override = quote.offerOverride;
   const editing = editHtml !== null;
-  // La cotización cambió después de editar la oferta: esos cambios no se ven en la versión editada.
-  const overrideStale = !!override && quote.version > override.version;
+  const hasEdits = !!stored && (stored.edits.length > 0 || stored.legacy);
 
-  /** HTML del documento sin la hoja de estilos (se guarda solo el contenido). */
-  function currentDocHtml(): string {
-    const doc = docRef.current?.querySelector('.proposal-doc')?.cloneNode(true) as HTMLElement | undefined;
-    if (!doc) return '';
-    doc.querySelector('style')?.remove();
-    return doc.innerHTML;
-  }
-
-  const clean = (html: string) =>
-    DOMPurify.sanitize(html, { FORBID_TAGS: ['style', 'script', 'iframe', 'form'] });
-
-  /** Guarda (o quita, con null) la versión editada de la oferta en la cotización. */
-  async function saveOverride(html: string | null) {
+  /** Guarda los cambios de texto (o los quita, con null) en la cotización. */
+  async function saveEdits(edits: OfferEdit[] | null) {
     if (!quote) return;
     setSavingEdit(true);
     try {
       const draft = quoteToDraft(quote);
-      draft.offerOverride = html
-        ? { html: clean(html), editedAt: new Date().toISOString(), version: quote.version + 1 }
-        : null;
+      draft.offerEdits = edits?.length ? { edits, editedAt: new Date().toISOString() } : null;
+      draft.offerOverride = null;
       const saved = await quotesApi.update(quote.id, quote.version, draft);
       qc.setQueryData(keys.quote(saved.id), saved);
       void qc.invalidateQueries({ queryKey: keys.quotes, refetchType: 'inactive' });
       setEditHtml(null);
-      notify(html ? '✓ Cambios de la oferta guardados' : '✓ Oferta restablecida desde la cotización');
+      notify(
+        edits?.length ? '✓ Cambios de la oferta guardados' : '✓ Oferta restablecida desde la cotización',
+      );
     } catch (err) {
       notify(`No se pudo guardar: ${errorMessage(err)}`, true);
     } finally {
@@ -179,14 +204,21 @@ export function OfferPage() {
     }
   }
 
+  /** Compara lo editado con la oferta generada y guarda solo los bloques que cambiaron. */
+  function saveEditing() {
+    if (!editRef.current) return;
+    const edits = diffEdits(parseFragment(baseHtml), parseFragment(editRef.current.innerHTML));
+    void saveEdits(edits);
+  }
+
   async function restoreOriginal() {
     const ok = await confirm({
-      title: '¿Volver a la oferta original?',
-      message: 'Se pierden los textos que editaste a mano y la oferta se arma de nuevo desde la cotización.',
-      confirmLabel: 'Volver a la original',
+      title: '¿Quitar los textos editados?',
+      message: 'Se pierden los textos que cambiaste a mano y la oferta queda tal como sale de la cotización.',
+      confirmLabel: 'Quitar textos editados',
       cancelLabel: 'Cancelar',
     });
-    if (ok) await saveOverride(null);
+    if (ok) await saveEdits(null);
   }
 
   /**
@@ -316,12 +348,7 @@ export function OfferPage() {
             <button type="button" disabled={savingEdit} onClick={() => setEditHtml(null)}>
               <X size={16} /> Cancelar
             </button>
-            <button
-              type="button"
-              className="primary"
-              disabled={savingEdit}
-              onClick={() => void saveOverride(editRef.current?.innerHTML ?? '')}
-            >
+            <button type="button" className="primary" disabled={savingEdit} onClick={saveEditing}>
               <Save size={16} /> {savingEdit ? 'Guardando…' : 'Guardar cambios'}
             </button>
           </div>
@@ -330,7 +357,8 @@ export function OfferPage() {
             <button
               type="button"
               title="Cambia palabras o frases de la oferta directamente sobre el documento"
-              onClick={() => setEditHtml(override ? clean(override.html) : currentDocHtml())}
+              disabled={!baseHtml}
+              onClick={() => setEditHtml(shown?.html ?? baseHtml)}
             >
               <Pencil size={16} /> Editar textos
             </button>
@@ -404,23 +432,38 @@ export function OfferPage() {
       {editing ? (
         <div className="alert info no-print">
           Modo edición: haz clic sobre cualquier texto de la oferta y escríbelo como en un documento. Al
-          terminar pulsa <b>Guardar cambios</b>. Los cambios quedan solo en esta oferta; la cotización no
-          cambia.
+          terminar pulsa <b>Guardar cambios</b>. Se guardan solo los textos que cambies: si después cambias el
+          precio o los ítems en la cotización, la oferta se actualiza y tus textos se conservan.
         </div>
-      ) : override ? (
-        <div className={overrideStale ? 'alert warning no-print' : 'alert info no-print'}>
-          Esta oferta tiene textos editados a mano ({new Date(override.editedAt).toLocaleString('es-CO')}).
-          {overrideStale
-            ? ' La cotización cambió después: esos cambios (precios, ítems, investigación) no se ven aquí hasta que vuelvas a la oferta original.'
-            : ' Si cambias la cotización, vuelve a la oferta original para verlos.'}{' '}
+      ) : hasEdits && stored ? (
+        <div className={shown?.missed.length ? 'alert warning no-print' : 'alert info no-print'}>
+          Esta oferta tiene {stored.edits.length} texto{stored.edits.length === 1 ? '' : 's'} editado
+          {stored.edits.length === 1 ? '' : 's'} a mano ({new Date(stored.editedAt).toLocaleString('es-CO')}).
+          Los precios y datos salen siempre de la cotización actualizada.{' '}
+          {stored.legacy ? 'Pulsa «Editar textos» y guarda para dejar esta oferta en el formato nuevo. ' : ''}
           <button
             type="button"
             className="small"
             disabled={savingEdit}
             onClick={() => void restoreOriginal()}
           >
-            <RotateCcw size={13} /> Volver a la oferta original
+            <RotateCcw size={13} /> Quitar textos editados
           </button>
+          {shown?.missed.length ? (
+            <details style={{ marginTop: 6 }}>
+              <summary>
+                {shown.missed.length} texto{shown.missed.length === 1 ? '' : 's'} ya no se pudo aplicar porque
+                ese texto cambió en la cotización. Míralos aquí y vuelve a escribirlos con «Editar textos».
+              </summary>
+              <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                {shown.missed.map((m, i) => (
+                  <li key={i}>
+                    <i>{m.from.slice(0, 120)}</i> → {parseFragment(m.html).textContent?.slice(0, 300)}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
         </div>
       ) : null}
 
@@ -492,12 +535,19 @@ export function OfferPage() {
         </div>
       ) : null}
 
+      {/* Oferta generada desde la cotización (oculta): base para editar y aplicar los textos. */}
+      <div ref={baseRef} hidden aria-hidden>
+        <ProposalDocument quote={quote} company={company} />
+      </div>
       <div ref={docRef} className="offer-frame">
         {editing ? (
           <>
             <style>{proposalCss}</style>
             <div
-              ref={editRef}
+              ref={(el) => {
+                editRef.current = el;
+                shownRef.current = el;
+              }}
               className="proposal-doc offer-editing"
               contentEditable
               suppressContentEditableWarning
@@ -505,10 +555,10 @@ export function OfferPage() {
               dangerouslySetInnerHTML={{ __html: editHtml }}
             />
           </>
-        ) : override ? (
-          <div className="proposal-doc">
+        ) : shown ? (
+          <div className="proposal-doc" ref={shownRef}>
             <style>{proposalCss}</style>
-            <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: clean(override.html) }} />
+            <div style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: shown.html }} />
           </div>
         ) : (
           <ProposalDocument quote={quote} company={company} />

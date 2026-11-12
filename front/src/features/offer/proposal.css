@@ -261,6 +261,13 @@
 .pp-card-dark .v { font-size: 17pt; font-weight: 800; margin: 1.5mm 0; line-height: 1.1; }
 .pp-card-dark .v.long { font-size: 12pt; }
 .pp-card-dark .s { font-size: 7.3pt; color: #c4d8e3; line-height: 1.4; }
+.pp-terms-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3mm; margin-top: 4mm; }
+.pp-terms-facts > div { background: var(--pp-navy); color: #fff; padding: 3.5mm 4mm; }
+.pp-terms-facts .k { font-size: 6.4pt; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; color: #8dc9e8; }
+.pp-terms-facts .v { font-size: 9pt; font-weight: 700; line-height: 1.3; margin-top: 1mm; }
+.pp-terms { margin-top: 6mm; display: grid; gap: 5mm; }
+.pp-terms h3 { font-size: 10.5pt; font-weight: 800; margin: 0 0 1.5mm; padding-left: 3mm; border-left: 1mm solid var(--pp-blue); }
+.pp-terms p { margin: 0; font-size: 9pt; line-height: 1.5; color: #34434e; white-space: pre-line; text-align: justify; }
 .pp-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10mm; margin-top: 7mm; }
 .pp-two-col h3 { font-size: 12pt; font-weight: 800; margin: 0 0 3mm; }
 .pp-two-col ul { list-style: none; margin: 0; padding: 0; }
