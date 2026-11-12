@@ -64,6 +64,14 @@ export function diffEdits(
   opts: { ignoreNumberChanges?: boolean } = {},
   out: OfferEdit[] = [],
 ): OfferEdit[] {
+  // Los bloques que salen de un campo del cotizador se guardan en la cotización (offer-fields), no
+  // como edición de la oferta; los de solo lectura (totales) no se editan. Al convertir ofertas
+  // antiguas sí se toman, porque ese HTML no traía las marcas de campo.
+  if (
+    !opts.ignoreNumberChanges &&
+    (base.hasAttribute('data-field') || base.getAttribute('contenteditable') === 'false')
+  )
+    return out;
   // Oferta antigua con filas distintas a las actuales (p. ej. se agregó un ítem): se emparejan los
   // hijos por su texto sin cifras en vez de por posición, para no mezclar filas de ítems distintos.
   if (

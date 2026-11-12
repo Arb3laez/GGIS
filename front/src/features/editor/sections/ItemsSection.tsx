@@ -39,6 +39,8 @@ export function ItemsSection() {
   const [filter, setFilter] = useState('');
   const [trmStatus, setTrmStatus] = useState('');
   const [bulkLaborPct, setBulkLaborPct] = useState(35);
+  /** Ítems con el campo de notas abierto (los que ya tienen notas se muestran siempre). */
+  const [notesOpen, setNotesOpen] = useState<Set<string>>(new Set());
 
   const catalogByKey = useMemo(() => {
     const m = new Map<string, CatalogItem>();
@@ -229,6 +231,24 @@ export function ItemsSection() {
                       aria-label="Descripción"
                       onChange={(e) => setDescription(it.id, e.target.value)}
                     />
+                    {it.notes || notesOpen.has(it.id) ? (
+                      <textarea
+                        className="cell item-notes"
+                        rows={2}
+                        value={it.notes}
+                        placeholder="Detalle o notas para la oferta (ej. Nota: no incluye bomba jockey)"
+                        aria-label="Detalle o notas del ítem para la oferta"
+                        onChange={(e) => editItem(it.id, (x) => void (x.notes = e.target.value))}
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        className="link-btn"
+                        onClick={() => setNotesOpen((s) => new Set(s).add(it.id))}
+                      >
+                        + Detalle / notas para la oferta
+                      </button>
+                    )}
                   </td>
                   <td>
                     <input

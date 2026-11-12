@@ -1,6 +1,7 @@
 import { THRESHOLDS } from '../constants';
 import type { QuoteDraft } from '../schemas';
 import { formatCop } from '../format';
+import { paymentSchedule } from './payments';
 import type { QuoteBreakdown, QuoteTotals } from './engine';
 
 export interface Suggestion<T> {
@@ -262,7 +263,20 @@ export function quoteWarnings(draft: QuoteDraft, breakdown: QuoteBreakdown): Quo
 
   const t = draft.terms;
   const paymentSum = t.advancePct + t.progressPct + t.onDeliveryPct;
-  if (Math.abs(paymentSum - 100) >= 0.01) {
+  if (t.paymentPlan?.length) {
+    // Con plan de pagos se compara en pesos: lo programado debe sumar el total del contrato.
+    const plan = paymentSchedule(draft, breakdown);
+    if (plan.total > 0 && !plan.balanced) {
+      out.push({
+        code: 'payment-split',
+        level: 'danger',
+        message:
+          plan.difference > 0
+            ? `El plan de pagos cubre ${formatCop(plan.scheduled)} de ${formatCop(plan.total)}: faltan ${formatCop(plan.difference)} por programar.`
+            : `El plan de pagos suma ${formatCop(plan.scheduled)}: se pasa ${formatCop(-plan.difference)} del total (${formatCop(plan.total)}).`,
+      });
+    }
+  } else if (Math.abs(paymentSum - 100) >= 0.01) {
     out.push({
       code: 'payment-split',
       level: 'danger',

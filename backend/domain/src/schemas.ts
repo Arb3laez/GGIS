@@ -65,6 +65,8 @@ export const quoteItemSchema = z.object({
    * Es solo una ayuda de compra: no cambia el costo, que sigue siendo por ML.
    */
   pipeLengthM: z.number().finite().positive().max(100).nullable().default(null),
+  /** Detalle o notas del ítem para la oferta (sale debajo de la descripción). */
+  notes: text(3_000).default(''),
 });
 
 export const overtimeHoursSchema = z.object({
@@ -118,6 +120,25 @@ export const pricingSchema = z.object({
   }),
 });
 
+export const PAYMENT_KINDS = ['advance', 'progress', 'final'] as const;
+export const PAYMENT_BASES = ['total', 'items', 'rest'] as const;
+
+/**
+ * Un pago del plan (anticipo, corte de obra o pago final). Su valor es `pct` % de la base:
+ * todo el contrato, unos ítems (p. ej. la bomba) o el resto del contrato sin esos ítems.
+ */
+export const paymentRowSchema = z.object({
+  id,
+  kind: z.enum(PAYMENT_KINDS),
+  concept: text(200),
+  pct,
+  base: z.enum(PAYMENT_BASES),
+  /** Ítems que forman la base cuando `base` = 'items'. */
+  itemIds: z.array(id).max(200).default([]),
+  /** Cuándo se paga (ej. "Mes 1", "Al firmar", "Contra entrega"). */
+  when: text(120).default(''),
+});
+
 export const termsSchema = z.object({
   deliveryNational: text(200),
   deliveryImport: text(200),
@@ -127,6 +148,13 @@ export const termsSchema = z.object({
   advancePct: pct,
   progressPct: pct,
   onDeliveryPct: pct,
+  /**
+   * Plan de pagos por cortes. Vacío = se usan los tres porcentajes de arriba. Al editarlo, esos
+   * porcentajes se recalculan desde el plan (para avisos, correo y reportes).
+   */
+  paymentPlan: z.array(paymentRowSchema).max(36).default([]),
+  /** Nota libre sobre la forma de pago (sale en la oferta). */
+  paymentNote: text(2_000).default(''),
   scope: text(10_000),
   warranty: text(5_000),
   exclusions: text(5_000),
@@ -301,6 +329,11 @@ export const quoteDraftSchema = z.object({
    * nuevo) se vuelve a aplicar sobre la oferta armada desde la cotización, así un cambio de precio
    * no borra las notas. null = sin cambios a mano.
    */
+  /**
+   * Textos de la oferta que no salen de otros campos (títulos, introducciones, listas…), cambiados
+   * por el usuario. Vacío = se usa la plantilla de la unidad de negocio. Clave = campo de la plantilla.
+   */
+  offerTexts: z.record(z.string().max(40), text(5_000)).default({}),
   offerEdits: z
     .object({
       edits: z
@@ -402,6 +435,9 @@ export type LineActual = z.infer<typeof lineActualSchema>;
 export type ClientInfo = z.infer<typeof clientSchema>;
 export type QuoteFollowUp = z.infer<typeof followUpSchema>;
 export type ClientResearch = z.infer<typeof clientResearchSchema>;
+export type PaymentRow = z.infer<typeof paymentRowSchema>;
+export type PaymentKind = (typeof PAYMENT_KINDS)[number];
+export type PaymentBase = (typeof PAYMENT_BASES)[number];
 export type ClientResearchRequest = z.infer<typeof clientResearchRequestSchema>;
 export type ResearchImageRequest = z.infer<typeof researchImageRequestSchema>;
 export type QuoteDraft = z.infer<typeof quoteDraftSchema>;

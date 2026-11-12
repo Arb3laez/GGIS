@@ -4,7 +4,9 @@ import {
   computeQuote,
   formatCop,
   formatLongDate,
+  PAYMENT_KIND_LABELS,
   PAYMENT_MODE_LABELS,
+  paymentSchedule,
   SERVICE_TYPE_LABELS,
   type CompanyProfile,
   type Quote,
@@ -13,6 +15,7 @@ import {
 import proposalCss from './proposal.css?raw';
 import { describeItem, effectiveBusinessUnit, fillTerms, proposalContent } from './proposal-content';
 import { attachmentUrl, LibraryImage, offerImages, photoCredit } from '../../shared/LibraryImage';
+import { field } from './offer-fields';
 
 const ITEMS_PER_PAGE = 9;
 
@@ -61,6 +64,8 @@ function warrantyLabel(text: string): string {
 interface TermsBlock {
   title: string;
   text: string;
+  /** Campo del cotizador de donde sale (para guardar lo editado sobre la oferta). */
+  field?: string;
 }
 
 /**
@@ -77,7 +82,7 @@ export function paginateTerms(blocks: TermsBlock[], firstBudget = 2_600, nextBud
     let title = block.title;
     const flush = () => {
       if (!current.trim()) return;
-      pages[pages.length - 1]!.push({ title, text: current.trim() });
+      pages[pages.length - 1]!.push({ title, text: current.trim(), field: block.field });
       left -= current.length + HEADING;
       current = '';
       title = `${block.title} (continuación)`;
@@ -117,17 +122,20 @@ function PageFooter({ page, total, number }: { page: number; total: number; numb
   );
 }
 
-function SectionHead({ number, title }: { number: string; title: string }) {
+function SectionHead({ number, title, fieldKey }: { number: string; title: string; fieldKey?: string }) {
   return (
     <div className="pp-sec-head">
       <div className="pp-sec-num">{number}</div>
-      <h1 className="pp-h1">{title}</h1>
+      <h1 className="pp-h1" {...(fieldKey ? field(fieldKey) : {})}>
+        {title}
+      </h1>
     </div>
   );
 }
 
 export function ProposalDocument({ quote: q, company }: { quote: Quote; company: CompanyProfile }) {
-  const { totals: t, items } = computeQuote(q);
+  const breakdown = computeQuote(q);
+  const { totals: t, items } = breakdown;
   const billable = q.items.map((it, i) => ({ it, b: items[i]! })).filter(({ b }) => b.isBillable);
   const content = proposalContent(q);
   const unit = effectiveBusinessUnit(q);
@@ -141,19 +149,40 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
   const needCredit = photoCredit(q.research, 'need');
   const solutionCredit = photoCredit(q.research, 'solution');
   const opportunity = q.research?.proposalText.trim() || content.opportunity;
+  const opportunityField = q.research?.proposalText.trim() ? 'research:proposalText' : 'text:opportunity';
+  // "No incluye" sale de las Exclusiones del cotizador salvo que se haya escrito una lista propia.
+  const excludesFromTerms = !q.offerTexts?.excludes?.trim() && !!q.terms.exclusions.trim();
   const serviceLabel = q.serviceType ? SERVICE_TYPE_LABELS[q.serviceType] : '';
   const unitLine = [unitLabel, serviceLabel].filter(Boolean).join(' · ') || 'Solución integral';
   const validUntil = formatLongDate(addDaysIso(q.issueDate, q.validDays));
   const itemPages = billable.length ? chunk(billable, ITEMS_PER_PAGE) : [[]];
+  // Plan de pagos por cortes (anticipos, cortes de obra, pago final) con su valor en pesos.
+  const schedule = paymentSchedule(q, breakdown);
+  const customPlan = (q.terms.paymentPlan?.length ?? 0) > 0;
+  const paymentNote = q.terms.paymentNote?.trim() ?? '';
+  const showPlan = customPlan || !!paymentNote;
+  const itemName = (id: string) => q.items.find((i) => i.id === id)?.description ?? 'ítem';
+  const baseText = (r: (typeof schedule.rows)[number]) =>
+    r.base === 'items'
+      ? `de ${r.itemIds.map(itemName).join(', ').slice(0, 70) || 'los ítems elegidos'}`
+      : r.base === 'rest'
+        ? 'del resto del contrato'
+        : 'del contrato';
   // Textos de "Condiciones de la oferta" del editor: van en su propia página antes del cierre.
   const termsPages = paginateTerms(
     [
-      { title: 'Alcance del suministro', text: q.terms.scope },
-      { title: 'Garantía', text: q.terms.warranty },
-      { title: 'Exclusiones y comentarios', text: q.terms.exclusions },
-      { title: 'Condiciones generales', text: q.terms.generalConditions },
+      { title: 'Alcance del suministro', text: q.terms.scope, field: 'terms:scope' },
+      { title: 'Garantía', text: q.terms.warranty, field: 'terms:warranty' },
+      // Si las exclusiones ya salen como "No incluye" en el cierre, no se repiten aquí.
+      ...(excludesFromTerms
+        ? []
+        : [{ title: 'Exclusiones y comentarios', text: q.terms.exclusions, field: 'terms:exclusions' }]),
+      { title: 'Condiciones generales', text: q.terms.generalConditions, field: 'terms:generalConditions' },
     ].filter((b) => b.text.trim()),
+    // La tabla del plan de pagos ocupa parte de la primera página.
+    showPlan ? Math.max(600, 2_600 - schedule.rows.length * 140 - paymentNote.length - 200) : 2_600,
   );
+  if (showPlan && !termsPages.length) termsPages.push([]);
   const totalPages = 5 + itemPages.length + termsPages.length;
   const closingNo = termsPages.length ? '06' : '05';
   const p = q.pricing;
@@ -196,12 +225,26 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
     { label: 'Avance', pct: q.terms.progressPct },
     { label: 'Contra entrega', pct: q.terms.onDeliveryPct },
   ].filter((x) => x.pct > 0);
-  const paymentValue = paymentParts.length
-    ? paymentParts.map((x) => `${x.pct}%`).join(' / ')
-    : PAYMENT_MODE_LABELS[q.terms.paymentMode];
-  const paymentSub = paymentParts.length
-    ? paymentParts.map((x) => x.label).join(' + ')
-    : PAYMENT_MODE_LABELS[q.terms.paymentMode];
+  const kindsSummary = [...new Set(schedule.rows.map((r) => r.kind))]
+    .map((k) => {
+      const n = schedule.rows.filter((r) => r.kind === k).length;
+      return n > 1
+        ? `${n} ${k === 'progress' ? 'cortes de obra' : `${PAYMENT_KIND_LABELS[k].toLowerCase()}s`}`
+        : PAYMENT_KIND_LABELS[k];
+    })
+    .join(' + ');
+  const paymentValue = customPlan
+    ? schedule.rows.length <= 3
+      ? schedule.rows.map((r) => `${Math.round(r.shareOfTotal)}%`).join(' / ')
+      : `${schedule.rows.length} pagos`
+    : paymentParts.length
+      ? paymentParts.map((x) => `${x.pct}%`).join(' / ')
+      : PAYMENT_MODE_LABELS[q.terms.paymentMode];
+  const paymentSub = customPlan
+    ? kindsSummary
+    : paymentParts.length
+      ? paymentParts.map((x) => x.label).join(' + ')
+      : PAYMENT_MODE_LABELS[q.terms.paymentMode];
   const installation = q.terms.installationTime || 'Según alcance';
 
   return (
@@ -219,13 +262,17 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
           </div>
           <div className="pp-cover-kicker">Propuesta comercial</div>
           <div className="pp-cover-rule" />
-          <h1 className="pp-cover-title">{content.tagline}</h1>
+          <h1 className="pp-cover-title" {...field('text:tagline')}>
+            {content.tagline}
+          </h1>
           <div className="pp-cover-client">
-            <div className="nm">{q.client.name || 'Cliente'}</div>
+            <div className="nm" {...field('client:name')}>
+              {q.client.name || 'Cliente'}
+            </div>
             <div className="pr">
-              {q.client.project || 'Proyecto'}
+              <span {...field('client:project')}>{q.client.project || 'Proyecto'}</span>
               <br />
-              {q.client.city || 'Colombia'}
+              <span {...field('client:city')}>{q.client.city || 'Colombia'}</span>
             </div>
             <div className="by">
               Una propuesta de {company.tradeName}
@@ -247,21 +294,29 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
       <section className="pp-page">
         <div className="pp-pad pp-fill">
           <PageHead left="G&G Innova Solutions" right="01 / La necesidad" />
-          <SectionHead number="01" title={content.needTitle} />
-          <p className="pp-intro">{content.needIntro}</p>
+          <SectionHead number="01" title={content.needTitle} fieldKey="text:needTitle" />
+          <p className="pp-intro" {...field('text:needIntro')}>
+            {content.needIntro}
+          </p>
 
           <div className="pp-client">
             <div>
               <div className="k">Cliente</div>
-              <div className="v">{q.client.name || '—'}</div>
+              <div className="v" {...field('client:name')}>
+                {q.client.name || '—'}
+              </div>
             </div>
             <div>
               <div className="k">Proyecto</div>
-              <div className="v">{q.client.project || '—'}</div>
+              <div className="v" {...field('client:project')}>
+                {q.client.project || '—'}
+              </div>
             </div>
             <div>
               <div className="k">Ciudad</div>
-              <div className="v">{q.client.city || '—'}</div>
+              <div className="v" {...field('client:city')}>
+                {q.client.city || '—'}
+              </div>
             </div>
             <div>
               <div className="k">Unidad</div>
@@ -270,20 +325,24 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
             {clientAddress ? (
               <div>
                 <div className="k">Dirección</div>
-                <div className="v">{clientAddress}</div>
+                <div className="v" {...field('research:address')}>
+                  {clientAddress}
+                </div>
               </div>
             ) : null}
             {projectSite ? (
               <div>
                 <div className="k">Sitio del proyecto</div>
-                <div className="v">{projectSite}</div>
+                <div className="v" {...field('research:projectSite')}>
+                  {projectSite}
+                </div>
               </div>
             ) : null}
           </div>
 
           <div className="pp-opportunity">
             <div className="k">La oportunidad</div>
-            <p>{opportunity}</p>
+            <p {...field(opportunityField)}>{opportunity}</p>
           </div>
 
           {/* La foto (y el mapa) ocupan el espacio que quede en la página, sin tapar el pie. */}
@@ -292,8 +351,8 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
               <LibraryImage candidates={needImages} alt="Instalaciones del cliente" />
               {needCredit ? <div className="pp-credit">Foto: {needCredit}</div> : null}
               <div className="ov">
-                <b>{content.needCaption}</b>
-                <span>{content.needSubcaption}</span>
+                <b {...field('text:needCaption')}>{content.needCaption}</b>
+                <span {...field('text:needSubcaption')}>{content.needSubcaption}</span>
               </div>
             </div>
             {mapImage ? (
@@ -315,31 +374,35 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
       <section className="pp-page">
         <div className="pp-pad">
           <PageHead left="La solución" right="02 / Arquitectura" />
-          <SectionHead number="02" title={content.architectureTitle} />
-          <p className="pp-intro">{content.architectureIntro}</p>
+          <SectionHead number="02" title={content.architectureTitle} fieldKey="text:architectureTitle" />
+          <p className="pp-intro" {...field('text:architectureIntro')}>
+            {content.architectureIntro}
+          </p>
 
           <div className="pp-media-grid">
             <div className="pp-media">
               <LibraryImage candidates={architectureImages} alt="Operación y monitoreo" />
               {solutionCredit ? <div className="pp-credit">Foto: {solutionCredit}</div> : null}
-              <div className="label">{content.architectureCaption}</div>
+              <div className="label" {...field('text:architectureCaption')}>
+                {content.architectureCaption}
+              </div>
             </div>
             <div className="pp-diagram">
               <div className="dt">Cadena de respuesta</div>
               <div className="flow">
                 <div className="step">
                   <em>01</em>
-                  {content.flow[0]}
+                  <span {...field('text:flow')}>{content.flow[0]}</span>
                 </div>
                 <div className="arrow">→</div>
                 <div className="step">
                   <em>02</em>
-                  {content.flow[1]}
+                  <span {...field('text:flow')}>{content.flow[1]}</span>
                 </div>
                 <div className="arrow">→</div>
                 <div className="step">
                   <em>03</em>
-                  {content.flow[2]}
+                  <span {...field('text:flow')}>{content.flow[2]}</span>
                 </div>
               </div>
               <div className="note">Equipos, configuración y pruebas integrados para responder a tiempo.</div>
@@ -349,7 +412,7 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
           <div className="pp-lists">
             <div className="pp-dark-list">
               <h3>Lo que integra G&amp;G</h3>
-              <ul>
+              <ul {...field('text:integration')}>
                 {content.integration.map((x) => (
                   <li key={x}>{x}</li>
                 ))}
@@ -418,15 +481,25 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
                         <tr key={it.id}>
                           <td className="n">{String(start + i + 1).padStart(2, '0')}</td>
                           <td className="comp">
-                            <b>{meta.title}</b>
-                            <span>{meta.detail}</span>
+                            <b {...field(`item:${it.id}:description`)}>{meta.title}</b>
+                            <span {...field(`item:${it.id}:notes`)}>
+                              {(it.notes ?? '').trim() || meta.detail}
+                            </span>
                           </td>
                           <td className="cant">
-                            {quantityText(it.quantity)}
-                            <small>{it.unit || 'UN'}</small>
+                            <span {...field(`item:${it.id}:quantity`)}>{quantityText(it.quantity)}</span>
+                            <small {...field(`item:${it.id}:unit`)}>{it.unit || 'UN'}</small>
                           </td>
-                          <td className="money mut">{formatCop(b.saleUnitPrice)}</td>
-                          <td className="money">{formatCop(b.saleTotal)}</td>
+                          <td className="money mut" {...field(`item:${it.id}:salePrice`)}>
+                            {formatCop(b.saleUnitPrice)}
+                          </td>
+                          <td
+                            className="money"
+                            contentEditable={false}
+                            title="Se calcula: cantidad × unitario"
+                          >
+                            {formatCop(b.saleTotal)}
+                          </td>
                         </tr>
                       );
                     })
@@ -443,7 +516,7 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
 
               {last ? (
                 <>
-                  <div className="pp-tot-wrap">
+                  <div className="pp-tot-wrap" contentEditable={false} title="Los totales se calculan solos">
                     <div className="pp-tot">
                       <table>
                         <tbody>
@@ -478,7 +551,15 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
                           )}
                           <tr className="total">
                             <td>Total oferta</td>
-                            <td>{formatCop(t.total)}</td>
+                            {/* Único valor editable de los totales: el cotizador ajusta el margen para llegar a él. */}
+                            <td
+                              contentEditable
+                              suppressContentEditableWarning
+                              title="Escribe el total que quieres: el margen se ajusta solo"
+                              {...field('pricing:total')}
+                            >
+                              {formatCop(t.total)}
+                            </td>
                           </tr>
                         </tbody>
                       </table>
@@ -500,8 +581,10 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
       <section className="pp-page">
         <div className="pp-pad">
           <PageHead left="Implementación" right="04 / Cómo avanzamos" />
-          <SectionHead number="04" title={content.implementationTitle} />
-          <p className="pp-intro">{content.implementationIntro}</p>
+          <SectionHead number="04" title={content.implementationTitle} fieldKey="text:implementationTitle" />
+          <p className="pp-intro" {...field('text:implementationIntro')}>
+            {content.implementationIntro}
+          </p>
 
           <div className="pp-stages">
             {content.stages.map((stage) => (
@@ -515,11 +598,11 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
 
           <div className="pp-delivery">
             <div className="k">Entrega recomendada</div>
-            <p>{fillTerms(content.delivery, q)}</p>
+            <p {...field('text:delivery')}>{fillTerms(content.delivery, q)}</p>
           </div>
 
           <div className="pp-check-title">Antes de aprobar la orden</div>
-          <div className="pp-check">
+          <div className="pp-check" {...field('text:checklist')}>
             {content.checklist.map((x) => (
               <div key={x}>{x}</div>
             ))}
@@ -537,7 +620,7 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
 
           <div className="pp-commitment">
             <div className="k">Nuestro compromiso</div>
-            <p>{content.commitment}</p>
+            <p {...field('text:commitment')}>{content.commitment}</p>
           </div>
           <PageFooter page={4 + itemPages.length} total={totalPages} number={q.number} />
         </div>
@@ -554,33 +637,80 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
                 <div className="pp-terms-facts">
                   <div>
                     <div className="k">Equipos nacionales</div>
-                    <div className="v">{q.terms.deliveryNational || 'Según disponibilidad'}</div>
+                    <div className="v" {...field('terms:deliveryNational')}>
+                      {q.terms.deliveryNational || 'Según disponibilidad'}
+                    </div>
                   </div>
                   <div>
                     <div className="k">Importación</div>
-                    <div className="v">{q.terms.deliveryImport || 'Según disponibilidad'}</div>
+                    <div className="v" {...field('terms:deliveryImport')}>
+                      {q.terms.deliveryImport || 'Según disponibilidad'}
+                    </div>
                   </div>
                   <div>
                     <div className="k">Instalación</div>
-                    <div className="v">{installation}</div>
+                    <div className="v" {...field('terms:installationTime')}>
+                      {installation}
+                    </div>
                   </div>
-                  <div>
+                  <div
+                    contentEditable={false}
+                    title="Se cambia en Condiciones de la oferta (porcentajes de pago)"
+                  >
                     <div className="k">Forma de pago</div>
                     <div className="v">
-                      {paymentParts.length
-                        ? paymentParts.map((x) => `${x.label} ${x.pct}%`).join(' · ')
-                        : PAYMENT_MODE_LABELS[q.terms.paymentMode]}
+                      {customPlan
+                        ? kindsSummary
+                        : paymentParts.length
+                          ? paymentParts.map((x) => `${x.label} ${x.pct}%`).join(' · ')
+                          : PAYMENT_MODE_LABELS[q.terms.paymentMode]}
                       {q.terms.financingDays > 0 ? ` · ${q.terms.financingDays} días` : ''}
                     </div>
                   </div>
                 </div>
               </>
             ) : null}
+            {i === 0 && showPlan ? (
+              <div className="pp-payplan">
+                <h3>Forma de pago</h3>
+                {customPlan ? (
+                  <table contentEditable={false} title="Se cambia en el plan de pagos del cotizador">
+                    <thead>
+                      <tr>
+                        <th>Pago</th>
+                        <th>Cuándo</th>
+                        <th>Cálculo</th>
+                        <th style={{ textAlign: 'right' }}>Valor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {schedule.rows.map((r) => (
+                        <tr key={r.id}>
+                          <td>
+                            <b>{r.concept || PAYMENT_KIND_LABELS[r.kind]}</b>
+                          </td>
+                          <td>{r.when}</td>
+                          <td>
+                            {Math.round(r.pct * 100) / 100}% {baseText(r)}
+                          </td>
+                          <td style={{ textAlign: 'right' }}>{formatCop(r.amount)}</td>
+                        </tr>
+                      ))}
+                      <tr className="tot">
+                        <td colSpan={3}>Total del contrato</td>
+                        <td style={{ textAlign: 'right' }}>{formatCop(schedule.scheduled)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                ) : null}
+                {paymentNote ? <p {...field('terms:paymentNote')}>{paymentNote}</p> : null}
+              </div>
+            ) : null}
             <div className="pp-terms">
               {blocks.map((b) => (
                 <div key={b.title}>
                   <h3>{b.title}</h3>
-                  <p>{b.text}</p>
+                  <p {...(b.field ? field(b.field) : {})}>{b.text}</p>
                 </div>
               ))}
             </div>
@@ -593,23 +723,34 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
       <section className="pp-page pp-last">
         <div className="pp-pad">
           <PageHead left="Condiciones" right={`${closingNo} / Cierre`} />
-          <SectionHead number={closingNo} title={content.closingTitle} />
-          <p className="pp-intro">{content.closingIntro}</p>
+          <SectionHead number={closingNo} title={content.closingTitle} fieldKey="text:closingTitle" />
+          <p className="pp-intro" {...field('text:closingIntro')}>
+            {content.closingIntro}
+          </p>
 
           <div className="pp-cards3">
-            <div className="pp-card-dark">
+            <div
+              className="pp-card-dark"
+              contentEditable={false}
+              title="Se calcula con los porcentajes de pago"
+            >
               <div className="k">Pago</div>
               <div className={`v${paymentValue.length > 12 ? ' long' : ''}`}>{paymentValue}</div>
               <div className="s">{paymentSub}</div>
             </div>
-            <div className="pp-card-dark">
+            <div className="pp-card-dark" contentEditable={false} title="Sale del texto de Garantía">
               <div className="k">Garantía</div>
               <div className="v">{warrantyLabel(q.terms.warranty)}</div>
               <div className="s">Por defectos de fabricación, según condiciones.</div>
             </div>
             <div className="pp-card-dark">
               <div className="k">Instalación</div>
-              <div className={`v${installation.length > 18 ? ' long' : ''}`}>{installation}</div>
+              <div
+                className={`v${installation.length > 18 ? ' long' : ''}`}
+                {...field('terms:installationTime')}
+              >
+                {installation}
+              </div>
               <div className="s">Sujeto a disponibilidad y condiciones del sitio.</div>
             </div>
           </div>
@@ -617,7 +758,7 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
           <div className="pp-two-col">
             <div>
               <h3>Incluye</h3>
-              <ul>
+              <ul {...field('text:includes')}>
                 {content.includes.map((x) => (
                   <li key={x}>{x}</li>
                 ))}
@@ -625,7 +766,7 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
             </div>
             <div>
               <h3>No incluye</h3>
-              <ul>
+              <ul {...field(excludesFromTerms ? 'terms:exclusions' : 'text:excludes')}>
                 {content.excludes.map((x) => (
                   <li key={x}>{x}</li>
                 ))}

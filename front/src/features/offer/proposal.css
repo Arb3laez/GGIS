@@ -265,6 +265,13 @@
 .pp-terms-facts > div { background: var(--pp-navy); color: #fff; padding: 3.5mm 4mm; }
 .pp-terms-facts .k { font-size: 6.4pt; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 700; color: #8dc9e8; }
 .pp-terms-facts .v { font-size: 9pt; font-weight: 700; line-height: 1.3; margin-top: 1mm; }
+.pp-payplan { margin-top: 6mm; }
+.pp-payplan h3 { font-size: 10.5pt; font-weight: 800; margin: 0 0 2mm; padding-left: 3mm; border-left: 1mm solid var(--pp-blue); }
+.pp-payplan table { width: 100%; border-collapse: collapse; font-size: 8.6pt; }
+.pp-payplan th { text-align: left; font-size: 6.6pt; letter-spacing: 0.12em; text-transform: uppercase; color: #fff; background: var(--pp-navy); padding: 2mm 3mm; }
+.pp-payplan td { padding: 1.8mm 3mm; border-bottom: 1px solid var(--pp-line); color: #34434e; }
+.pp-payplan tr.tot td { font-weight: 800; color: var(--pp-navy); border-bottom: 0; }
+.pp-payplan p { margin: 2.5mm 0 0; font-size: 9pt; line-height: 1.5; color: #34434e; white-space: pre-line; }
 .pp-terms { margin-top: 6mm; display: grid; gap: 5mm; }
 .pp-terms h3 { font-size: 10.5pt; font-weight: 800; margin: 0 0 1.5mm; padding-left: 3mm; border-left: 1mm solid var(--pp-blue); }
 .pp-terms p { margin: 0; font-size: 9pt; line-height: 1.5; color: #34434e; white-space: pre-line; text-align: justify; }

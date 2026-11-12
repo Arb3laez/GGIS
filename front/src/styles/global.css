@@ -1956,3 +1956,84 @@ button.danger:hover:not(:disabled) {
   outline: 2px dashed var(--accent);
   outline-offset: 3px;
 }
+
+/* Notas por ítem (salen debajo de la descripción en la oferta) */
+.item-notes {
+  margin-top: 4px;
+  resize: vertical;
+  min-height: 44px;
+  line-height: 1.4;
+}
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.link-btn:hover {
+  text-decoration: underline;
+}
+
+/* Textos de la oferta agrupados por página */
+.offer-texts-group {
+  border-top: 1px solid var(--line);
+  padding: 8px 0;
+}
+.offer-texts-group > summary {
+  cursor: pointer;
+  font-weight: 700;
+  padding: 4px 0;
+}
+.offer-texts-group[open] > summary {
+  margin-bottom: 6px;
+}
+
+/* Plan de pagos por cortes */
+.pay-table td {
+  vertical-align: top;
+}
+.pay-items {
+  margin-top: 4px;
+  font-size: 12px;
+}
+.pay-items > summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+}
+.pay-items label {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+  padding: 3px 0;
+}
+.pay-summary {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+.pay-summary.ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.pay-summary.bad {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.pay-months {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.pay-months .cell {
+  width: 64px;
+}

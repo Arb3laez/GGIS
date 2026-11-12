@@ -25,6 +25,7 @@ import { PricingSection } from './sections/PricingSection';
 import { SolutionPicker } from './sections/SolutionPicker';
 import { StaffSection } from './sections/StaffSection';
 import { TermsSection } from './sections/TermsSection';
+import { OfferTextsSection } from './sections/OfferTextsSection';
 import { clearLocalDraft, readLocalDraft, saveLocalDraft, useEditor } from './store';
 import { useSaveQuote } from './useSaveQuote';
 
@@ -48,6 +49,7 @@ const SECTIONS = [
   { id: 'actividades', label: 'M.O. por actividad' },
   { id: 'otros', label: 'Otros costos' },
   { id: 'condiciones', label: 'Condiciones' },
+  { id: 'textos', label: 'Textos oferta' },
   { id: 'precio', label: 'Precio' },
   { id: 'cierre', label: 'Auditoría' },
 ];
@@ -304,6 +306,7 @@ export function QuoteEditorPage() {
             addLabel="+ Agregar costo"
           />
           <TermsSection />
+          <OfferTextsSection />
           <PricingSection />
         </div>
         <SummaryAside />

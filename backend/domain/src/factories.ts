@@ -38,6 +38,7 @@ export function blankItem(description = '', unit = ''): QuoteItem {
     complexity: 'medium',
     salePriceOverride: null,
     pipeLengthM: null,
+    notes: '',
   };
 }
 
@@ -127,6 +128,7 @@ export function createEmptyDraft(now: Date = new Date()): QuoteDraft {
     transactionType: 'quote',
     followUp: followUpSchema.parse({}),
     research: null,
+    offerTexts: {},
     offerEdits: null,
     offerOverride: null,
     client: {
@@ -171,6 +173,8 @@ export function createEmptyDraft(now: Date = new Date()): QuoteDraft {
       advancePct: 40,
       progressPct: 60,
       onDeliveryPct: 0,
+      paymentPlan: [],
+      paymentNote: '',
       ...DEFAULT_TERMS_TEXT,
     },
     closure: {

@@ -669,7 +669,9 @@ const CONTENT: Record<BusinessUnit, UnitProposalContent> = {
  * Algunas cotizaciones viejas tienen la unidad de negocio mal marcada. Si los ítems
  * hablan claramente de incendios o CCTV, esa evidencia manda sobre la etiqueta.
  */
-export function effectiveBusinessUnit(q: Quote): BusinessUnit | null {
+export function effectiveBusinessUnit(
+  q: Pick<Quote, 'client' | 'items' | 'businessUnit'>,
+): BusinessUnit | null {
   const text = [q.client.project, ...q.items.map((i) => i.description)].join(' ').toLowerCase();
   const fire = (
     text.match(/incend|fuego|humo|detector|extinci|sirena|estaci[oó]n manual|facp|rociador/g) ?? []
@@ -680,9 +682,92 @@ export function effectiveBusinessUnit(q: Quote): BusinessUnit | null {
   return q.businessUnit;
 }
 
-export function proposalContent(q: Quote): UnitProposalContent {
+/** Plantilla de textos de la unidad de negocio, sin los cambios del usuario. */
+export function templateContent(q: Pick<Quote, 'client' | 'items' | 'businessUnit'>): UnitProposalContent {
   const unit = effectiveBusinessUnit(q);
   return unit ? (CONTENT[unit] ?? GENERIC) : GENERIC;
+}
+
+type TextKey = {
+  [K in keyof UnitProposalContent]: UnitProposalContent[K] extends string ? K : never;
+}[keyof UnitProposalContent];
+type ListKey = 'flow' | 'integration' | 'checklist' | 'includes' | 'excludes';
+export type OfferTextKey = TextKey | ListKey;
+
+/** Textos de la oferta que se pueden cambiar (en el cotizador o directamente sobre la oferta). */
+export const OFFER_TEXT_FIELDS: Array<{ key: OfferTextKey; label: string; page: string; list?: boolean }> = [
+  { key: 'tagline', label: 'Frase de portada', page: 'Portada' },
+  { key: 'needTitle', label: 'Título', page: '01 · La necesidad' },
+  { key: 'needIntro', label: 'Introducción', page: '01 · La necesidad' },
+  { key: 'opportunity', label: 'La oportunidad (si no hay investigación)', page: '01 · La necesidad' },
+  { key: 'needCaption', label: 'Texto sobre la foto', page: '01 · La necesidad' },
+  { key: 'needSubcaption', label: 'Subtexto sobre la foto', page: '01 · La necesidad' },
+  { key: 'architectureTitle', label: 'Título', page: '02 · Arquitectura' },
+  { key: 'architectureIntro', label: 'Introducción', page: '02 · Arquitectura' },
+  { key: 'architectureCaption', label: 'Texto sobre la imagen', page: '02 · Arquitectura' },
+  {
+    key: 'flow',
+    label: 'Cadena de respuesta (3 pasos, uno por línea)',
+    page: '02 · Arquitectura',
+    list: true,
+  },
+  { key: 'integration', label: 'Qué integra (uno por línea)', page: '02 · Arquitectura', list: true },
+  { key: 'implementationTitle', label: 'Título', page: '04 · Cómo avanzamos' },
+  { key: 'implementationIntro', label: 'Introducción', page: '04 · Cómo avanzamos' },
+  { key: 'delivery', label: 'Entrega', page: '04 · Cómo avanzamos' },
+  {
+    key: 'checklist',
+    label: 'Antes de aprobar la orden (uno por línea)',
+    page: '04 · Cómo avanzamos',
+    list: true,
+  },
+  { key: 'commitment', label: 'Nuestro compromiso', page: '04 · Cómo avanzamos' },
+  { key: 'closingTitle', label: 'Título', page: 'Cierre' },
+  { key: 'closingIntro', label: 'Introducción', page: 'Cierre' },
+  { key: 'includes', label: 'Incluye (uno por línea)', page: 'Cierre', list: true },
+  {
+    key: 'excludes',
+    label: 'No incluye (uno por línea; si está vacío se usan tus Exclusiones y comentarios)',
+    page: 'Cierre',
+    list: true,
+  },
+];
+
+/** Separa un texto en puntos: una línea por punto o, si viene en un párrafo, por frases. */
+export function splitPoints(text: string): string[] {
+  const lines = text
+    .split(/\r?\n/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  const points = lines.length > 1 ? lines : text.split(/(?<=[.;])\s+/).map((x) => x.trim());
+  return points.filter(Boolean);
+}
+
+/** Valor de un texto de la plantilla como texto plano (las listas, una línea por punto). */
+export function offerTextValue(content: UnitProposalContent, key: OfferTextKey): string {
+  const v = content[key];
+  return Array.isArray(v) ? v.join('\n') : String(v);
+}
+
+/**
+ * Textos de la oferta = plantilla + lo que el usuario cambió. "No incluye" usa las Exclusiones y
+ * comentarios del cotizador cuando hay, para no repetir una lista distinta.
+ */
+export function proposalContent(q: Quote): UnitProposalContent {
+  const base = templateContent(q);
+  const texts = q.offerTexts ?? {};
+  const out: UnitProposalContent = { ...base };
+  for (const { key, list } of OFFER_TEXT_FIELDS) {
+    const v = texts[key];
+    if (v === undefined || !v.trim()) continue;
+    if (!list) (out as Record<string, unknown>)[key] = v;
+    else if (key === 'flow') {
+      const steps = splitPoints(v);
+      out.flow = [steps[0] ?? base.flow[0], steps[1] ?? base.flow[1], steps[2] ?? base.flow[2]];
+    } else (out as Record<string, unknown>)[key] = splitPoints(v);
+  }
+  if (!texts.excludes?.trim() && q.terms.exclusions.trim()) out.excludes = splitPoints(q.terms.exclusions);
+  return out;
 }
 
 export function describeItem(item: QuoteItem): string {

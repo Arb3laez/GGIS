@@ -4,6 +4,7 @@ import { Alerts } from '../../../shared/feedback';
 import { SectionTitle } from '../../../shared/SectionTitle';
 import { NumberField, SelectField, TextArea, TextField } from '../../../shared/inputs';
 import { useBreakdown, useDraft, useEdit } from '../store';
+import { PaymentPlanEditor } from './PaymentPlanEditor';
 
 export function TermsSection() {
   const d = useDraft();
@@ -53,24 +54,8 @@ export function TermsSection() {
           onChange={(n) => edit((x) => void (x.terms.financingDays = Math.round(n)))}
         />
       </div>
-      <div className="section-title">Distribución del pago (% sobre el valor de venta)</div>
-      <div className="grid-3">
-        <NumberField
-          label="Anticipo (%)"
-          value={t.advancePct}
-          onChange={(n) => edit((x) => void (x.terms.advancePct = n))}
-        />
-        <NumberField
-          label="Avance por ejecución (%)"
-          value={t.progressPct}
-          onChange={(n) => edit((x) => void (x.terms.progressPct = n))}
-        />
-        <NumberField
-          label="Contra entrega (%)"
-          value={t.onDeliveryPct}
-          onChange={(n) => edit((x) => void (x.terms.onDeliveryPct = n))}
-        />
-      </div>
+      <div className="section-title">Plan de pagos (anticipos, cortes de obra y pago final)</div>
+      <PaymentPlanEditor />
       <Alerts items={warnings} />
 
       <TextArea

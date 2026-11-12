@@ -6,6 +6,7 @@ import {
   computeQuote,
   formatCop,
   PAYMENT_MODE_LABELS,
+  paymentSchedule,
   safeFileName,
   type CompanyProfile,
   type Quote,
@@ -34,6 +35,8 @@ import {
 import { errorMessage, useToast } from '../../shared/feedback';
 import { attachImageFallback, attachmentUrl } from '../../shared/LibraryImage';
 import { applyEdits, cleanHtml, diffEdits, parseFragment, unwrapDoc, type OfferEdit } from './offer-edits';
+import { applyFieldChanges, fieldChanges, type FieldSyncResult } from './offer-fields';
+import { templateContent } from './proposal-content';
 import { ProposalDocument } from './ProposalDocument';
 import proposalCss from './proposal.css?raw';
 
@@ -68,7 +71,14 @@ async function inlineImages(root: HTMLElement): Promise<string> {
 }
 
 function emailDraft(q: Quote, company: CompanyProfile) {
-  const t = computeQuote(q).totals;
+  const breakdown = computeQuote(q);
+  const t = breakdown.totals;
+  // Con plan de pagos por cortes, el correo lista cada pago con su valor.
+  const plan = q.terms.paymentPlan?.length
+    ? paymentSchedule(q, breakdown).rows.map(
+        (r) => `- ${r.concept}${r.when ? ` (${r.when})` : ''}: ${formatCop(r.amount)}`,
+      )
+    : [];
   const pagos = [
     q.terms.advancePct > 0 ? `Anticipo: ${q.terms.advancePct}%` : '',
     q.terms.progressPct > 0 ? `Avance por ejecución: ${q.terms.progressPct}%` : '',
@@ -81,7 +91,12 @@ function emailDraft(q: Quote, company: CompanyProfile) {
     '',
     `Valor total de la oferta: ${formatCop(t.total)}`,
     `Validez: ${q.validDays} días a partir de la fecha de emisión.`,
-    pagos.length ? `Forma de pago: ${pagos.join(' · ')} (${paymentText(q)})` : '',
+    plan.length
+      ? ['Forma de pago:', ...plan].join('\n')
+      : pagos.length
+        ? `Forma de pago: ${pagos.join(' · ')} (${paymentText(q)})`
+        : '',
+    q.terms.paymentNote?.trim() ?? '',
     '',
     'Tiempos de entrega:',
     `- Equipos nacionales: ${q.terms.deliveryNational}`,
@@ -183,20 +198,31 @@ export function OfferPage() {
   const hasEdits = !!stored && (stored.edits.length > 0 || stored.legacy);
 
   /** Guarda los cambios de texto (o los quita, con null) en la cotización. */
-  async function saveEdits(edits: OfferEdit[] | null) {
+  /**
+   * Guarda en la cotización: los campos cambiados sobre la oferta (`sync`, van al cotizador) y los
+   * textos que no tienen campo (`edits`, quedan solo en la oferta). `edits` null = quitarlos todos.
+   */
+  async function saveEdits(edits: OfferEdit[] | null, sync?: Array<[string, string]>) {
     if (!quote) return;
     setSavingEdit(true);
     try {
       const draft = quoteToDraft(quote);
+      let result: FieldSyncResult = { updated: [], errors: [] };
+      if (sync?.length) result = applyFieldChanges(draft, sync, templateContent(quote));
       draft.offerEdits = edits?.length ? { edits, editedAt: new Date().toISOString() } : null;
       draft.offerOverride = null;
       const saved = await quotesApi.update(quote.id, quote.version, draft);
       qc.setQueryData(keys.quote(saved.id), saved);
       void qc.invalidateQueries({ queryKey: keys.quotes, refetchType: 'inactive' });
+      void qc.invalidateQueries({ queryKey: ['analytics'] });
       setEditHtml(null);
-      notify(
-        edits?.length ? '✓ Cambios de la oferta guardados' : '✓ Oferta restablecida desde la cotización',
-      );
+      if (edits === null) notify('✓ Oferta restablecida desde la cotización');
+      else if (result.updated.length)
+        notify(
+          `✓ Actualizado en el cotizador: ${result.updated.slice(0, 4).join(', ')}${result.updated.length > 4 ? ` y ${result.updated.length - 4} más` : ''}`,
+        );
+      else notify('✓ Cambios de la oferta guardados');
+      if (result.errors.length) notify(result.errors.join(' '), true);
     } catch (err) {
       notify(`No se pudo guardar: ${errorMessage(err)}`, true);
     } finally {
@@ -207,8 +233,22 @@ export function OfferPage() {
   /** Compara lo editado con la oferta generada y guarda solo los bloques que cambiaron. */
   function saveEditing() {
     if (!editRef.current) return;
-    const edits = diffEdits(parseFragment(baseHtml), parseFragment(editRef.current.innerHTML));
-    void saveEdits(edits);
+    const base = parseFragment(baseHtml);
+    const edited = parseFragment(editRef.current.innerHTML);
+    // Lo que sale de un campo del cotizador vuelve al cotizador; el resto queda como texto de la oferta.
+    void saveEdits(diffEdits(base, edited), fieldChanges(base, edited));
+  }
+
+  /** Enter = salto de línea (no crea bloques nuevos) y pegar = solo texto, para no romper el diseño. */
+  function onEditKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.execCommand('insertLineBreak');
+    }
+  }
+  function onEditPaste(e: React.ClipboardEvent<HTMLDivElement>) {
+    e.preventDefault();
+    document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
   }
 
   async function restoreOriginal() {
@@ -432,8 +472,9 @@ export function OfferPage() {
       {editing ? (
         <div className="alert info no-print">
           Modo edición: haz clic sobre cualquier texto de la oferta y escríbelo como en un documento. Al
-          terminar pulsa <b>Guardar cambios</b>. Se guardan solo los textos que cambies: si después cambias el
-          precio o los ítems en la cotización, la oferta se actualiza y tus textos se conservan.
+          terminar pulsa <b>Guardar cambios</b>. Lo que sale del cotizador (cliente, ítems, cantidades,
+          precios unitarios, condiciones y textos de la oferta) se actualiza también en el cotizador; los
+          totales se recalculan solos.
         </div>
       ) : hasEdits && stored ? (
         <div className={shown?.missed.length ? 'alert warning no-print' : 'alert info no-print'}>
@@ -552,6 +593,8 @@ export function OfferPage() {
               contentEditable
               suppressContentEditableWarning
               spellCheck
+              onKeyDown={onEditKeyDown}
+              onPaste={onEditPaste}
               dangerouslySetInnerHTML={{ __html: editHtml }}
             />
           </>
