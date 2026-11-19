@@ -81,7 +81,7 @@ export const quoteItemSchema = z.object({
   notes: text(3_000).default(''),
   /** Nº del ítem en la lista del cliente (p. ej. formato de licitación); vacío = ítem propio. */
   clientRef: z.string().max(20).nullable().optional(),
-  /** Grupo o frente de la lista del cliente (p. ej. "TORRE MAR"). */
+  /** Grupo o frente de la lista del cliente (p. ej. "TORRE A"). */
   group: z.string().max(120).nullable().optional(),
   /** Líneas de cotizaciones de proveedor con las que se armó el precio del ítem (trazabilidad). */
   priceSources: z.array(priceSourceSchema).max(20).optional(),
@@ -221,6 +221,8 @@ export const followUpSchema = z.object({
   closeDate: isoDateSchema.nullable().default(null),
   /** Observación del seguimiento. */
   note: text(2_000).default(''),
+  /** Observación por etapa (clave = etapa del catálogo, p. ej. "cierre-mes"). */
+  stageNotes: z.record(z.string().max(40), text(2_000)).default({}),
 });
 
 /** Investigación comercial del cliente (búsqueda web): empresa, sedes, proyecto y texto para la oferta. */
@@ -378,6 +380,10 @@ export const quoteDraftSchema = z.object({
   validDays: z.number().int().min(1).max(365),
   /** TRM COP/USD aplicada a los ítems en dólares. */
   exchangeRate: z.number().finite().positive(),
+  /** Fecha de vigencia de la TRM usada (la que sale en la oferta); null en cotizaciones antiguas. */
+  exchangeRateOn: isoDateSchema.nullable().default(null),
+  /** De dónde salió la TRM: oficial (Superfinanciera), mercado (respaldo) o escrita a mano. */
+  exchangeRateSource: z.enum(['trm-oficial', 'mercado', 'manual']).nullable().default(null),
   /** % de nacionalización + transporte a bodega. */
   importCostPct: pct,
   items: z.array(quoteItemSchema).max(2_000),
@@ -425,10 +431,12 @@ export const importedRowSchema = z.object({
   note: z.string().max(300).optional(),
   /** Referencia o código del proveedor. */
   reference: z.string().max(120).optional(),
-  /** Grupo o frente al que pertenece la fila (p. ej. "TORRE MAR"). */
+  /** Grupo o frente al que pertenece la fila (p. ej. "TORRE A"). */
   group: z.string().max(120).optional(),
   /** Nº de ítem en la lista del cliente (solo al leer la lista del cliente). */
   clientRef: z.string().max(20).optional(),
+  /** Archivo del que salió la fila (al cargar varias cotizaciones a la vez). */
+  source: z.string().max(200).optional(),
 });
 
 /** Asociar las líneas de una cotización de proveedor a los ítems que ya tiene la cotización. */

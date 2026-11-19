@@ -22,6 +22,7 @@ function q(p: Partial<QuoteSummary>): QuoteSummary {
     sendStatus: null,
     closeDate: null,
     note: '',
+    stageNote: '',
     lossReason: null,
     nextFollowUp: null,
     stage: null,

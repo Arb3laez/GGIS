@@ -19,10 +19,10 @@ describe('respuesta del modelo', () => {
           description: ' Base para detector estándar ',
           unit: '',
           quantity: 95,
-          unitPrice: 10557.46,
+          unitPrice: 10000,
           currency: 'COP',
           reference: 'KI-SB',
-          group: 'TORRE SIERRA',
+          group: 'TORRE B',
         },
         { description: '', unit: 'UN', quantity: 1, unitPrice: 5, currency: 'COP', reference: '', group: '' },
       ],
@@ -33,9 +33,9 @@ describe('respuesta del modelo', () => {
         unit: 'UN',
         quantity: 95,
         currency: 'COP',
-        unitPrice: 10557.46,
+        unitPrice: 10000,
         reference: 'KI-SB',
-        group: 'TORRE SIERRA',
+        group: 'TORRE B',
       },
     ]);
   });
@@ -64,6 +64,19 @@ describe('respuesta del modelo', () => {
       { row: 0, itemId: 'uuid-1', kind: 'shared', factor: 1 },
       { row: 0, itemId: 'uuid-2', kind: 'shared', factor: 1 },
     ]);
+  });
+
+  it('descarta factores fuera del rango que acepta la cotización', () => {
+    const items = [{ id: 'uuid-1', description: 'Tubo', unit: 'ML', quantity: 10 }];
+    const { keys } = matchPayload(items, [
+      { description: 'Tubo', unit: 'UN', quantity: 4, currency: 'COP', unitPrice: 1 },
+    ]);
+    const links = linksFromModel(
+      { links: [{ row: 0, item: 'I1', kind: 'direct', factor: 5_000 }] },
+      items,
+      keys,
+    );
+    expect(links[0]!.factor).toBe(1);
   });
 
   it('rechaza respuestas con otro formato', () => {

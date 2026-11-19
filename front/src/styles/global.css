@@ -1592,6 +1592,21 @@ section[id] {
   padding: 10px 12px;
   font-size: 13px;
 }
+.match-missing {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+.match-missing li {
+  margin: 2px 0;
+}
+.match-unpriced {
+  margin: 0 0 12px;
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.match-unpriced .filters {
+  margin: 0;
+}
 .match-unmatched {
   display: flex;
   justify-content: space-between;
@@ -2064,8 +2079,56 @@ button.danger:hover:not(:disabled) {
 }
 
 /* Plan de pagos por cortes */
+/* Tabla del plan de pagos: ocupa el ancho de la tarjeta (sin el mínimo de 1120px de la tabla de
+   ítems) y, si la pantalla es angosta, se desplaza dentro de su propio contenedor. */
+.pay-wrap {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.pay-table {
+  width: 100%;
+  min-width: 760px;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.pay-table th {
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 6px 6px 8px;
+  border-bottom: 1px solid var(--line);
+  white-space: nowrap;
+}
 .pay-table td {
   vertical-align: top;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--line);
+}
+.pay-table td .cell,
+.pay-table td select.cell {
+  width: 100%;
+  min-width: 0;
+}
+.pay-table td .hint {
+  overflow-wrap: anywhere;
+}
+.pay-table td.pay-amount {
+  text-align: right;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pay-table td.pay-remove {
+  text-align: center;
+  padding-left: 0;
+  padding-right: 0;
+}
+.pay-table td.pay-remove .icon-btn {
+  width: 28px;
+  height: 28px;
+  font-size: 15px;
+  line-height: 1;
 }
 .pay-items {
   margin-top: 4px;
@@ -2104,4 +2167,20 @@ button.danger:hover:not(:disabled) {
 }
 .pay-months .cell {
   width: 64px;
+}
+
+/* Observación por etapa en el editor (Cliente → Seguimiento comercial). */
+.stage-notes {
+  /* Ocupa toda la fila: queda justo debajo de "Nivel de oferta (etapa)". */
+  grid-column: 1 / -1;
+  margin-bottom: 8px;
+}
+.stage-notes__list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.stage-notes__list li {
+  margin: 2px 0;
 }

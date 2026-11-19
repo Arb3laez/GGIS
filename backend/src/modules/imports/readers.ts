@@ -1,6 +1,13 @@
 import * as XLSX from 'xlsx';
 import { extractTextItems } from 'unpdf';
-import { parseSheetRows, parseTextLines, type ImportedRow } from '@ggis/domain';
+import {
+  parseQuoteLayout,
+  parseSheetRows,
+  parseTextLines,
+  type ImportedRow,
+  type LayoutResult,
+  type TextFragment,
+} from '@ggis/domain';
 
 /** Lee la primera hoja de un Excel/CSV y devuelve los ítems detectados. */
 export function readSpreadsheet(data: Buffer): ImportedRow[] {
@@ -12,16 +19,37 @@ export function readSpreadsheet(data: Buffer): ImportedRow[] {
   return parseSheetRows(aoa);
 }
 
+async function pdfFragments(data: Buffer): Promise<TextFragment[]> {
+  const { items } = await extractTextItems(new Uint8Array(data));
+  return items.flatMap((page, p) =>
+    page.map((it) => ({ page: p, x: it.x, y: it.y, str: it.str, height: it.height })),
+  );
+}
+
 /**
- * Método alterno (sin IA) para PDF con texto: reconstruye las líneas agrupando los fragmentos por
- * su posición vertical y luego aplica el lector de líneas del dominio.
+ * Lee la tabla de una cotización en PDF con texto, sin IA: solo toma renglones donde
+ * cantidad × valor unitario = valor total (ver `parseQuoteLayout`). `verified` indica que la suma
+ * coincide con el subtotal del documento.
+ */
+export async function readPdfLayout(data: Buffer): Promise<LayoutResult> {
+  return parseQuoteLayout(await pdfFragments(data));
+}
+
+/**
+ * Método alterno (sin IA) para PDF con texto. Primero la lectura por posiciones y aritmética; si
+ * no encuentra nada, reconstruye las líneas y aplica el lector de líneas del dominio.
  */
 export async function readPdfText(data: Buffer): Promise<ImportedRow[]> {
-  const { items } = await extractTextItems(new Uint8Array(data));
+  const fragments = await pdfFragments(data);
+  const layout = parseQuoteLayout(fragments);
+  if (layout.rows.length) return layout.rows;
+
+  const byPage = new Map<number, TextFragment[]>();
+  for (const f of fragments) byPage.set(f.page, [...(byPage.get(f.page) ?? []), f]);
   let text = '';
-  for (const page of items) {
+  for (const page of [...byPage.keys()].sort((a, b) => a - b)) {
     const lines = new Map<number, Array<{ x: number; s: string }>>();
-    for (const it of page) {
+    for (const it of byPage.get(page)!) {
       const y = Math.round(it.y);
       const line = lines.get(y) ?? [];
       line.push({ x: it.x, s: it.str });

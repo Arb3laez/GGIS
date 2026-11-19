@@ -1,14 +1,6 @@
 import { useState, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  findStage,
-  FOLLOW_UP_STAGES,
-  formatCop,
-  SEND_STATUS_LABELS,
-  TEMPERATURE_LABELS,
-  type SendStatus,
-  type Temperature,
-} from '@ggis/domain';
+import { findStage, FOLLOW_UP_STAGES, formatCop, SEND_STATUS_LABELS, type SendStatus } from '@ggis/domain';
 
 /**
  * Componentes del sistema de diseño GYG Innova (gyg-design-system/components/bundle.js),
@@ -92,12 +84,22 @@ export function Button({
   className,
   children,
   ...rest
-}: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary'; icon?: string; collapse?: boolean }) {
+}: ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: 'primary' | 'secondary';
+  icon?: string;
+  collapse?: boolean;
+}) {
   return (
     <button
       type="button"
       {...rest}
-      className={cx('gyg-btn', 'body-strong', `gyg-btn--${variant}`, collapse && 'gyg-btn--collapse', className)}
+      className={cx(
+        'gyg-btn',
+        'body-strong',
+        `gyg-btn--${variant}`,
+        collapse && 'gyg-btn--collapse',
+        className,
+      )}
     >
       {icon ? <Icon name={icon} /> : null}
       {children != null ? <span className="gyg-btn__label">{children}</span> : null}
@@ -290,7 +292,9 @@ export function TextField({
     <input type={type} inputMode={inputMode} {...common} onChange={(e) => onChange?.(e.target.value)} />
   );
   const field = (
-    <label className={cx('gyg-field', 'gyg-field--text', multiline && 'gyg-field--area', !caption && className)}>
+    <label
+      className={cx('gyg-field', 'gyg-field--text', multiline && 'gyg-field--area', !caption && className)}
+    >
       {control}
     </label>
   );
@@ -375,7 +379,6 @@ export interface QuoteCardProps {
   identification?: string;
   project?: string;
   type?: string;
-  temperature?: Temperature | null;
   sendStatus?: SendStatus | null;
   closeDate?: string | null;
   phone2?: string;
@@ -392,6 +395,8 @@ export interface QuoteCardProps {
   due?: { label: string; overdue?: boolean } | null;
   responded?: boolean;
   note?: string;
+  /** Observación escrita para la etapa actual. */
+  stageNote?: string;
   total?: number;
   onStatusChange?: (v: GygStatus) => void;
   onAction?: (k: QuoteAction) => void;
@@ -408,19 +413,17 @@ export function QuoteCard(p: QuoteCardProps) {
   if (pct != null) stageText.push(`${pct}% de cierre`);
   const tags = [p.unit, p.service].filter(Boolean) as string[];
   const metaParts = [p.code, p.date && p.date + (p.age ? ` (${p.age})` : '')].filter(Boolean).join(' · ');
-  const tempLabel = p.temperature ? TEMPERATURE_LABELS[p.temperature] : null;
   const sendLabel = p.sendStatus ? SEND_STATUS_LABELS[p.sendStatus] : null;
   const dash = '—';
   const detail: Array<[string, string]> = [
-    ['Tipo de transacción', p.type || 'Cotización'],
     ['Identificación (NIT / CC)', p.identification || dash],
     ['Sucursal / proyecto', p.project || dash],
     ['Estado de envío', sendLabel ?? dash],
     ['Mes', cap1(monthOf(p.date)) || dash],
     ['Cierre estimado', p.closeDate || dash],
-    ['Temperatura', tempLabel ?? dash],
     ['Teléfono 2', p.phone2 || dash],
-    ['Observación', p.note || dash],
+    [`Observación de la etapa${st ? ` · ${st.label}` : ''}`, p.stageNote || dash],
+    ['Observación general', p.note || dash],
   ];
   const clientName = p.client || '(sin cliente)';
 
@@ -444,7 +447,12 @@ export function QuoteCard(p: QuoteCardProps) {
               </span>
             ))}
           </div>
-          <button type="button" className="gyg-q__more meta" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <button
+            type="button"
+            className="gyg-q__more meta"
+            aria-expanded={open}
+            onClick={() => setOpen(!open)}
+          >
             {open ? 'Ocultar detalle' : 'Más detalles'}
             <Icon name="chevron" size={14} />
           </button>
@@ -464,12 +472,18 @@ export function QuoteCard(p: QuoteCardProps) {
 
         <div className="gyg-q__status">
           <div className="gyg-q__chips">
-            <StatusSelect value={p.status} onChange={p.onStatusChange} label={`Estado de ${p.code ?? 'la cotización'}`} />
-            {p.temperature === 'caliente' || p.temperature === 'tibio' ? (
-              <span className={cx('gyg-temp', `gyg-temp--${p.temperature}`, 'meta')}>{tempLabel}</span>
-            ) : null}
+            <StatusSelect
+              value={p.status}
+              onChange={p.onStatusChange}
+              label={`Estado de ${p.code ?? 'la cotización'}`}
+            />
           </div>
           <div className="meta gyg-muted">{stageText.join(' · ')}</div>
+          {p.stageNote ? (
+            <div className="meta gyg-stage-note" title={p.stageNote}>
+              {p.stageNote}
+            </div>
+          ) : null}
         </div>
 
         <div className="gyg-q__follow">
@@ -513,7 +527,10 @@ export function QuoteCard(p: QuoteCardProps) {
             {detail.map(([k, v]) => (
               <div
                 key={k}
-                className={cx('gyg-q__kv', (k === 'Observación' || k === 'Sucursal / proyecto') && 'is-wide')}
+                className={cx(
+                  'gyg-q__kv',
+                  (k.startsWith('Observación') || k === 'Sucursal / proyecto') && 'is-wide',
+                )}
               >
                 <dt className="meta gyg-muted">{k}</dt>
                 <dd className="body">{v}</dd>
@@ -588,7 +605,10 @@ export function StageSummary({
 /** Opciones del selector de nivel de oferta, con su probabilidad. */
 export const STAGE_OPTIONS: Option[] = [
   { value: '', label: 'Etapa sin definir' },
-  ...FOLLOW_UP_STAGES.map((s) => ({ value: s.value, label: s.label + (s.pct != null ? ` (${s.pct}%)` : '') })),
+  ...FOLLOW_UP_STAGES.map((s) => ({
+    value: s.value,
+    label: s.label + (s.pct != null ? ` (${s.pct}%)` : ''),
+  })),
 ];
 
 /* ------------------------------------------------------------------ Contenedores */
@@ -618,7 +638,15 @@ export function QuoteList({
   );
 }
 
-export function PageHeader({ title, subtitle, children }: { title: string; subtitle?: string; children?: ReactNode }) {
+export function PageHeader({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle?: string;
+  children?: ReactNode;
+}) {
   return (
     <div className="gyg-hwrap">
       <header className="gyg-header">

@@ -8,10 +8,6 @@ import {
   SEND_STATUSES,
   SERVICE_TYPE_LABELS,
   SERVICE_TYPES,
-  TEMPERATURE_LABELS,
-  TEMPERATURES,
-  TRANSACTION_TYPE_LABELS,
-  TRANSACTION_TYPES,
   type BusinessUnit,
   type Quote,
   type QuoteDraft,
@@ -50,6 +46,8 @@ export interface QuoteFormValue {
   closeDate: string;
   nextFollowUp: string;
   note: string;
+  /** Observación por etapa (clave = etapa). */
+  stageNotes: Record<string, string>;
 }
 
 export function quoteToForm(q: Quote): QuoteFormValue {
@@ -71,6 +69,7 @@ export function quoteToForm(q: Quote): QuoteFormValue {
     closeDate: q.followUp.closeDate ?? '',
     nextFollowUp: q.nextFollowUp ?? '',
     note: q.followUp.note,
+    stageNotes: { ...(q.followUp.stageNotes ?? {}) },
   };
 }
 
@@ -101,6 +100,7 @@ export function applyForm(draft: QuoteDraft, f: QuoteFormValue): QuoteDraft {
       sendStatus: f.sendStatus || null,
       closeDate: f.closeDate || null,
       note: f.note,
+      stageNotes: Object.fromEntries(Object.entries(f.stageNotes).filter(([, t]) => t.trim())),
     },
   };
 }
@@ -158,7 +158,12 @@ export function QuoteFormPanel({
           <fieldset className="gyg-form__sec">
             <legend className="col-label">Cliente</legend>
             <div className="gyg-form__grid">
-              <TextField caption="Nombre del cliente" value={v.client} onChange={set('client')} className="is-wide" />
+              <TextField
+                caption="Nombre del cliente"
+                value={v.client}
+                onChange={set('client')}
+                className="is-wide"
+              />
               <TextField
                 caption="Identificación (NIT / CC)"
                 value={v.identification}
@@ -166,9 +171,20 @@ export function QuoteFormPanel({
                 inputMode="numeric"
                 maxLength={30}
               />
-              <TextField caption="Sucursal / proyecto" value={v.project} onChange={set('project')} className="is-wide" />
+              <TextField
+                caption="Sucursal / proyecto"
+                value={v.project}
+                onChange={set('project')}
+                className="is-wide"
+              />
               <TextField caption="Contacto" value={v.contactName} onChange={set('contactName')} />
-              <TextField caption="Número de contacto" type="tel" value={v.phone} onChange={set('phone')} maxLength={40} />
+              <TextField
+                caption="Número de contacto"
+                type="tel"
+                value={v.phone}
+                onChange={set('phone')}
+                maxLength={40}
+              />
               <TextField
                 caption="Número de contacto 2"
                 type="tel"
@@ -182,12 +198,6 @@ export function QuoteFormPanel({
           <fieldset className="gyg-form__sec">
             <legend className="col-label">Cotización</legend>
             <div className="gyg-form__grid">
-              <SelectField
-                caption="Tipo de transacción"
-                value={v.type}
-                onChange={set('type')}
-                options={TRANSACTION_TYPES.map((t) => ({ value: t, label: TRANSACTION_TYPE_LABELS[t] }))}
-              />
               <TextField caption="Número de cotización" value={quote.number} disabled />
               <TextField caption="Fecha de elaboración" type="date" value={v.date} onChange={set('date')} />
               <SelectField
@@ -224,19 +234,30 @@ export function QuoteFormPanel({
                 onChange={set('stage')}
                 options={[...STAGE_OPTIONS, ...legacyStage]}
               />
-              <SelectField
-                caption="Temperatura"
-                value={v.temperature}
-                onChange={set('temperature')}
-                options={opt(TEMPERATURE_LABELS, TEMPERATURES, 'Sin temperatura')}
-              />
+              {v.stage ? (
+                <TextField
+                  caption={`Observación de la etapa · ${stage ? (stage.pct != null ? `${stage.label} (${stage.pct}%)` : stage.label) : v.stage}`}
+                  multiline
+                  value={v.stageNotes[v.stage] ?? ''}
+                  onChange={(x) =>
+                    setV((prev) => ({ ...prev, stageNotes: { ...prev.stageNotes, [prev.stage]: x } }))
+                  }
+                  className="is-wide"
+                  maxLength={2000}
+                />
+              ) : null}
               <SelectField
                 caption="Estado de envío"
                 value={v.sendStatus}
                 onChange={set('sendStatus')}
                 options={opt(SEND_STATUS_LABELS, SEND_STATUSES, 'Seleccione')}
               />
-              <TextField caption="Cierre estimado" type="date" value={v.closeDate} onChange={set('closeDate')} />
+              <TextField
+                caption="Cierre estimado"
+                type="date"
+                value={v.closeDate}
+                onChange={set('closeDate')}
+              />
               <div className="gyg-fw">
                 <span className="meta gyg-fw__cap">Probabilidad de cierre</span>
                 <div className="gyg-form__prob body-strong">
@@ -249,7 +270,14 @@ export function QuoteFormPanel({
                 value={v.nextFollowUp}
                 onChange={set('nextFollowUp')}
               />
-              <TextField caption="Observación" multiline value={v.note} onChange={set('note')} className="is-wide" maxLength={2000} />
+              <TextField
+                caption="Observación general"
+                multiline
+                value={v.note}
+                onChange={set('note')}
+                className="is-wide"
+                maxLength={2000}
+              />
             </div>
           </fieldset>
         </div>

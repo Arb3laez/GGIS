@@ -49,6 +49,7 @@ type CrmColumns = Pick<
   | 'sendStatus'
   | 'closeDate'
   | 'note'
+  | 'stageNote'
 >;
 
 function crmOf(raw: unknown): CrmColumns {
@@ -66,6 +67,7 @@ function crmOf(raw: unknown): CrmColumns {
     sendStatus: c.sendStatus ?? null,
     closeDate: c.closeDate ?? null,
     note: c.note ?? '',
+    stageNote: c.stageNote ?? '',
   };
 }
 
@@ -128,6 +130,7 @@ function summaryParams(s: QuoteSummary) {
       sendStatus: s.sendStatus,
       closeDate: s.closeDate,
       note: s.note,
+      stageNote: s.stageNote,
     } satisfies CrmColumns),
   };
 }

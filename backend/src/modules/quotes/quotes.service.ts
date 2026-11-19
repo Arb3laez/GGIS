@@ -221,6 +221,7 @@ function summarize(r: QuoteRecord): QuoteSummary {
     sendStatus: r.draft.followUp.sendStatus,
     closeDate: r.draft.followUp.closeDate,
     note: r.draft.followUp.note,
+    stageNote: r.draft.stage ? (r.draft.followUp.stageNotes?.[r.draft.stage] ?? '') : '',
     issueDate: r.draft.issueDate,
     validDays: r.draft.validDays,
     status: r.draft.status,

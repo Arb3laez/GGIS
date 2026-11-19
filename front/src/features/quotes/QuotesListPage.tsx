@@ -11,10 +11,7 @@ import {
   SEND_STATUSES,
   SERVICE_TYPE_LABELS,
   SERVICE_TYPES,
-  TEMPERATURE_LABELS,
-  TEMPERATURES,
   todayIso,
-  TRANSACTION_TYPE_LABELS,
   type Quote,
   type QuoteSummary,
 } from '@ggis/domain';
@@ -72,7 +69,6 @@ export function QuotesListPage() {
     svc: params.get('service') ?? '',
     year: params.get('year') ?? '',
     month: params.get('month') ?? '',
-    temp: params.get('temp') ?? '',
     send: params.get('send') ?? '',
   };
   const setParam = (key: string) => (value: string) => {
@@ -91,7 +87,6 @@ export function QuotesListPage() {
       (!f.svc || r.serviceType === f.svc) &&
       (!f.year || r.issueDate.slice(0, 4) === f.year) &&
       (!f.month || monthOf(r.issueDate) === f.month) &&
-      (!f.temp || r.temperature === f.temp) &&
       (!f.send || r.sendStatus === f.send) &&
       (!term || searchable(r).includes(term)),
   );
@@ -112,7 +107,9 @@ export function QuotesListPage() {
     try {
       const r = await backupApi.import(file);
       m.invalidate();
-      notify(`Se importaron ${r.imported} cotizaciones${r.attachments ? ` y ${r.attachments} adjuntos` : ''}.`);
+      notify(
+        `Se importaron ${r.imported} cotizaciones${r.attachments ? ` y ${r.attachments} adjuntos` : ''}.`,
+      );
       if (r.warnings.length) notify(r.warnings.slice(0, 3).join(' · '), true);
     } catch (err) {
       notify(errorMessage(err), true);
@@ -260,7 +257,11 @@ export function QuotesListPage() {
 
       <div className="gyg-filterbar">
         <div className="gyg-filterbar__row">
-          <SearchField value={f.q} onChange={setParam('q')} placeholder="Cliente, NIT, proyecto, contacto, tel" />
+          <SearchField
+            value={f.q}
+            onChange={setParam('q')}
+            placeholder="Cliente, NIT, proyecto, contacto, tel"
+          />
           <SelectField
             label="Unidad de negocio"
             value={f.unit}
@@ -291,12 +292,6 @@ export function QuotesListPage() {
             ]}
           />
           <SelectField
-            label="Temperatura"
-            value={f.temp}
-            onChange={setParam('temp')}
-            options={options('Toda temperatura', TEMPERATURES, TEMPERATURE_LABELS)}
-          />
-          <SelectField
             label="Estado de envío"
             value={f.send}
             onChange={setParam('send')}
@@ -316,7 +311,10 @@ export function QuotesListPage() {
           </p>
         ) : null}
         {shown.map((q) => {
-          const overdue = !!q.nextFollowUp && q.nextFollowUp <= today && (q.status === 'sent' || q.status === 'negotiating');
+          const overdue =
+            !!q.nextFollowUp &&
+            q.nextFollowUp <= today &&
+            (q.status === 'sent' || q.status === 'negotiating');
           return (
             <QuoteCard
               key={q.id}
@@ -324,7 +322,6 @@ export function QuotesListPage() {
               client={q.clientName}
               identification={q.identification}
               project={q.projectName}
-              type={TRANSACTION_TYPE_LABELS[q.transactionType]}
               code={q.number}
               date={q.issueDate}
               age={`hace ${daysBetween(q.issueDate, today)} d`}
@@ -335,15 +332,18 @@ export function QuotesListPage() {
               phone2={q.contactPhone2}
               status={toGygStatus(q.status)}
               stage={q.stage}
-              temperature={q.temperature}
               sendStatus={q.sendStatus}
               closeDate={q.closeDate}
               due={
                 q.nextFollowUp
-                  ? { label: overdue ? `Vencido · ${q.nextFollowUp}` : `Seguimiento ${q.nextFollowUp}`, overdue }
+                  ? {
+                      label: overdue ? `Vencido · ${q.nextFollowUp}` : `Seguimiento ${q.nextFollowUp}`,
+                      overdue,
+                    }
                   : null
               }
               note={q.note}
+              stageNote={q.stageNote}
               total={q.total}
               onStatusChange={(s) =>
                 m.setStatus.mutate(
@@ -386,7 +386,10 @@ export function QuotesListPage() {
         <QuoteFormPanel
           quote={editing.quote}
           total={editing.total}
-          saving={saving} onSave={(v) => void saveForm(v)} onCancel={() => setEditing(null)} />
+          saving={saving}
+          onSave={(v) => void saveForm(v)}
+          onCancel={() => setEditing(null)}
+        />
       ) : null}
     </div>
   );

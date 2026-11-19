@@ -44,15 +44,15 @@ describe('parseSheetRows', () => {
       ['PROPUESTA ECONÓMICA'],
       ['Item', 'Descripción', 'Unidad', 'Cantidad'],
       [],
-      ['', 'TORRE MAR'],
+      ['', 'TORRE A'],
       [1, 'Adaptador Terminal Ø 3/4"', 'Und', 444],
       [2, 'Fuente auxiliar', 'Und', 1],
-      ['', 'TORRE SIERRA'],
+      ['', 'TORRE B'],
       [14, 'Adaptador Terminal Ø 3/4"', 'Und', 368],
     ]);
     expect(rows).toHaveLength(3);
-    expect(rows[0]).toMatchObject({ clientRef: '1', group: 'TORRE MAR', quantity: 444, unitPrice: 0 });
-    expect(rows[2]).toMatchObject({ clientRef: '14', group: 'TORRE SIERRA', quantity: 368 });
+    expect(rows[0]).toMatchObject({ clientRef: '1', group: 'TORRE A', quantity: 444, unitPrice: 0 });
+    expect(rows[2]).toMatchObject({ clientRef: '14', group: 'TORRE B', quantity: 368 });
   });
 
   it('lista del cliente sin precios', () => {

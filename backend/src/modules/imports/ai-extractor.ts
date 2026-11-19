@@ -17,7 +17,7 @@ Para cada ítem:
 - unitPrice: precio unitario como número, sin símbolos ni separadores de miles. Si solo aparece el valor total de la línea, divídelo por la cantidad.
 - currency: "USD" si el documento indica dólares; si no, "COP".
 - reference: referencia, modelo o código del proveedor; "" si no hay.
-- group: título de la sección a la que pertenece la línea (p. ej. "TORRE MAR", "PISO 2"); "" si el documento no agrupa.
+- group: título de la sección a la que pertenece la línea (p. ej. "TORRE A", "PISO 2"); "" si el documento no agrupa.
 Si el documento no contiene ítems cotizados, devuelve la lista vacía.`;
 
 export const MATCH_PROMPT = `Eres presupuestador de una empresa colombiana de seguridad electrónica y protección contra incendios.
@@ -165,7 +165,8 @@ export function linksFromModel(json: unknown, items: MatchTargetItem[], keys: st
       row: l.row,
       itemId: byKey.get(l.item)!,
       kind: l.kind,
-      factor: l.factor > 0 ? l.factor : 1,
+      // Mismo rango que acepta la cotización al guardar (0 < factor ≤ 1000); lo demás se toma como 1.
+      factor: Number.isFinite(l.factor) && l.factor > 0 && l.factor <= 1_000 ? l.factor : 1,
     }));
 }
 

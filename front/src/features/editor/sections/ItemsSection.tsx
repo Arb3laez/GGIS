@@ -1,13 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   blankItem,
   formatCop,
+  formatLongDate,
   newRowId,
   PIPE_LENGTHS,
   pipeLengthLabel,
   pipePieces,
   pipePiecesExact,
   quoteWarnings,
+  todayIso,
   type CatalogItem,
   type Complexity,
   type Currency,
@@ -18,7 +20,7 @@ import { exchangeRateApi, useCatalog } from '../../../api/queries';
 import { SectionTitle } from '../../../shared/SectionTitle';
 import { Alerts, errorMessage, useToast } from '../../../shared/feedback';
 import { Checkbox, formatPesos, formatPrice, NumberField, NumberInput } from '../../../shared/inputs';
-import { useBreakdown, useDraft, useEdit } from '../store';
+import { useBreakdown, useDraft, useEdit, useEditor } from '../store';
 import { ImportPanel } from './ImportPanel';
 
 const marginColor = (pct: number) => (pct >= 25 ? 'var(--ok)' : pct >= 12 ? 'var(--warn)' : 'var(--danger)');
@@ -88,19 +90,36 @@ export function ItemsSection() {
       }
     });
 
-  async function fetchTrm() {
+  async function fetchTrm(silent = false) {
     setTrmStatus('Consultando…');
     try {
       const r = await exchangeRateApi.current();
-      edit((x) => void (x.exchangeRate = r.rate));
-      setTrmStatus(
-        `${r.source === 'trm-oficial' ? 'TRM oficial' : 'Tasa de mercado'} vigente el ${r.validOn}`,
-      );
+      // La TRM, su fecha y su origen quedan en la cotización y salen en la oferta.
+      edit((x) => {
+        x.exchangeRate = r.rate;
+        x.exchangeRateOn = r.validOn;
+        x.exchangeRateSource = r.source;
+      });
+      setTrmStatus('');
     } catch (err) {
       setTrmStatus('');
-      notify(errorMessage(err), true);
+      if (!silent) notify(errorMessage(err), true);
     }
   }
+
+  // Cotización nueva: toma la TRM del día al crearla (es la que se informa en la oferta).
+  const quoteId = useEditor((s) => s.quoteId);
+  const autoTrm = useRef(false);
+  useEffect(() => {
+    if (quoteId || d.exchangeRateOn || autoTrm.current) return;
+    autoTrm.current = true;
+    void fetchTrm(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteId, d.exchangeRateOn]);
+
+  const trmInfo = d.exchangeRateOn
+    ? `${d.exchangeRateSource === 'trm-oficial' ? 'TRM oficial' : d.exchangeRateSource === 'mercado' ? 'Tasa de mercado' : 'TRM escrita a mano'} del ${formatLongDate(d.exchangeRateOn)} · sale en la oferta`
+    : 'Sin fecha: pulsa "Actualizar TRM" para tomar la del día';
 
   return (
     <section className="card" id="items" aria-labelledby="items-title">
@@ -120,7 +139,14 @@ export function ItemsSection() {
           label="TRM del día (COP/USD)"
           value={d.exchangeRate}
           format={formatPesos}
-          onChange={(n) => n > 0 && edit((x) => void (x.exchangeRate = n))}
+          onChange={(n) =>
+            n > 0 &&
+            edit((x) => {
+              x.exchangeRate = n;
+              x.exchangeRateOn = todayIso();
+              x.exchangeRateSource = 'manual';
+            })
+          }
         />
         <NumberField
           label="% nacionalización + transporte a bodega"
@@ -128,10 +154,10 @@ export function ItemsSection() {
           onChange={(n) => edit((x) => void (x.importCostPct = n))}
         />
         <div>
-          <button type="button" className="small" onClick={fetchTrm}>
+          <button type="button" className="small" onClick={() => void fetchTrm()}>
             Actualizar TRM
           </button>
-          <div className="hint">{trmStatus}</div>
+          <div className="hint">{trmStatus || trmInfo}</div>
         </div>
       </div>
 

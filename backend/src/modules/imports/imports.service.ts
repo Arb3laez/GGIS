@@ -1,5 +1,7 @@
 import {
+  completeLinks,
   evaluateLinks,
+  formatCop,
   matchPrices,
   parsePastedText,
   type ImportedRow,
@@ -12,7 +14,13 @@ import type { Logger } from '../../lib/logger';
 import type { AttachmentsService } from '../attachments/attachments.service';
 import { isSpreadsheet, sniffDocumentType } from '../attachments/file-type';
 import { AiExtractionError, type AiExtractor } from './ai-extractor';
-import { readPdfText, readSpreadsheet } from './readers';
+import { readPdfLayout, readPdfText, readSpreadsheet } from './readers';
+
+/** Mejor asociación: más ítems con precio, menos líneas sueltas y menos ítems por revisar. */
+const matchScore = (r: PriceMatchResult) =>
+  r.items.filter((i) => i.status === 'ok').length * 2 +
+  r.items.filter((i) => i.status === 'review').length -
+  r.unmatchedRows.length * 2;
 
 /**
  * Importación de ítems. Siempre devuelve una PREVISUALIZACIÓN: el usuario revisa y confirma en
@@ -57,23 +65,25 @@ export class ImportsService {
   }
 
   /**
-   * Relaciona las líneas de un proveedor con los ítems existentes (no crea ítems). Usa la IA si
-   * está configurada y, si falla o no está, las reglas del dominio. La evaluación (precios,
-   * cantidades, lo que no se relacionó) siempre la hace el dominio.
+   * Relaciona las líneas de los proveedores con los ítems existentes (no crea ítems). Primero las
+   * reglas del dominio (exactas con cantidades, torres, material); solo si dejan ítems o líneas
+   * sin relacionar y la IA está configurada, se prueba la IA y se queda el mejor resultado. La
+   * evaluación (precios, cantidades, lo que no se relacionó) siempre la hace el dominio.
    */
   async matchPrices(items: MatchTargetItem[], rows: ImportedRow[]): Promise<PriceMatchResult> {
-    if (this.ai.enabled && this.ai.match) {
-      try {
-        const links = await this.ai.match(items, rows);
-        return evaluateLinks(items, rows, links, 'ai');
-      } catch (err) {
-        if (!(err instanceof AiExtractionError)) throw err;
-        this.log.warn({ reason: err.message }, 'Asociación con IA falló; se usan las reglas');
-        const res = matchPrices(items, rows);
-        return { ...res, message: `${res.message} (Se usaron las reglas: ${err.message})` };
-      }
+    const rules = matchPrices(items, rows);
+    // Si todas las líneas del proveedor encontraron su ítem, la IA no puede mejorar nada: los ítems
+    // sin precio son los que ningún documento trae.
+    if (rules.unmatchedRows.length === 0 || !this.ai.enabled || !this.ai.match) return rules;
+    try {
+      const links = await this.ai.match(items, rows);
+      const ai = evaluateLinks(items, rows, completeLinks(items, rows, links), 'ai');
+      return matchScore(ai) > matchScore(rules) ? ai : rules;
+    } catch (err) {
+      if (!(err instanceof AiExtractionError)) throw err;
+      this.log.warn({ reason: err.message }, 'Asociación con IA falló; se usan las reglas');
+      return { ...rules, message: `${rules.message} (La IA no respondió: ${err.message})` };
     }
-    return matchPrices(items, rows);
   }
 
   fromText(text: string): ImportPreview {
@@ -87,6 +97,23 @@ export class ImportsService {
     if (!mime) throw badRequest('Solo se aceptan PDF o imágenes (PNG, JPG, WEBP).');
     const attachment = quoteId ? this.attachments.add(quoteId, fileName, data) : undefined;
     const withAttachment = attachment ? { attachment } : {};
+
+    // PDF con texto cuya tabla cuadra con su subtotal: lectura exacta, sin gastar IA.
+    if (mime === 'application/pdf') {
+      try {
+        const layout = await readPdfLayout(data);
+        if (layout.verified) {
+          return {
+            rows: layout.rows,
+            method: 'pdf-text',
+            message: `Se leyeron ${layout.rows.length} ítems del PDF y su suma cuadra con el subtotal del documento (${layout.rows[0]!.currency === 'USD' ? `US$${layout.total.toLocaleString('es-CO')}` : formatCop(layout.total)}).`,
+            ...withAttachment,
+          };
+        }
+      } catch (err) {
+        this.log.warn({ err }, 'No se pudo leer la tabla del PDF por posiciones');
+      }
+    }
 
     let aiFailure: string | null = null;
     if (this.ai.enabled) {

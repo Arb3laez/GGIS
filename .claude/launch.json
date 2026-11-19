@@ -34,6 +34,8 @@
       ],
       "port": 5174,
       "env": {
+        "OPENAI_API_KEY": "",
+        "GOOGLE_MAPS_API_KEY": "",
         "API_PORT": "4100",
         "DATA_DIR": "C:\\Users\\DIEGOA~1\\AppData\\Local\\Temp\\claude\\C--Users-DiegoArbel-ez-Proyectos-Cotizador-GyG\\49ea92b4-6a7d-4606-9921-2093195df87b\\scratchpad\\demo-data"
       }

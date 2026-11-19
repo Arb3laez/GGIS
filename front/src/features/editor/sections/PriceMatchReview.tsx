@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   evaluateLinks,
+  lineFactor,
   type ImportedRow,
   type MatchLink,
   type MatchLinkKind,
@@ -23,6 +24,8 @@ interface Props {
   rows: ImportedRow[];
   initial: PriceMatchResult;
   document: string;
+  /** TRM de la cotización (COP por USD) para ítems con líneas en monedas distintas. */
+  exchangeRate: number;
   onApply: (updates: PriceUpdate[]) => void;
   onCancel: () => void;
 }
@@ -31,7 +34,12 @@ const KIND_LABEL: Record<MatchLinkKind, string> = {
   direct: 'Directo',
   shared: 'Compartido',
   component: 'Componente',
+  reference: 'Precio de otro grupo',
 };
+
+/** "× 1/3" cuando la línea es un tubo de 3 m y el ítem va en metros. */
+const factorText = (f: number) =>
+  f === 1 ? '' : f < 1 ? ` · 1/${Math.round(1 / f)} por unidad del ítem` : ` · ×${f}`;
 
 const fmtQty = (n: number) => n.toLocaleString('es-CO', { maximumFractionDigits: 2 });
 
@@ -40,12 +48,12 @@ const fmtQty = (n: number) => n.toLocaleString('es-CO', { maximumFractionDigits:
  * dan precio, las alertas, las líneas que no se relacionaron (se pueden asignar a mano) y los
  * ítems que quedan sin precio. Nada se agrega como ítem nuevo.
  */
-export function PriceMatchReview({ items, rows, initial, document, onApply, onCancel }: Props) {
+export function PriceMatchReview({ items, rows, initial, document, exchangeRate, onApply, onCancel }: Props) {
   const [links, setLinks] = useState<MatchLink[]>(() => initial.items.flatMap((i) => i.links));
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const result = useMemo(
-    () => evaluateLinks(items, rows, links, initial.method),
-    [items, rows, links, initial.method],
+    () => evaluateLinks(items, rows, links, initial.method, exchangeRate),
+    [items, rows, links, initial.method, exchangeRate],
   );
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
 
@@ -54,12 +62,16 @@ export function PriceMatchReview({ items, rows, initial, document, onApply, onCa
 
   const priced = result.items.filter((r) => r.status !== 'none');
   const missing = result.items.filter((r) => r.status === 'none');
-  const toApply = priced.filter((r) => !skipped.has(r.itemId));
+  const toApply = priced.filter((r) => !r.blocked && !skipped.has(r.itemId));
 
   const removeLink = (l: MatchLink) =>
     setLinks((ls) => ls.filter((x) => !(x.row === l.row && x.itemId === l.itemId)));
   const assign = (row: number, itemId: string, kind: MatchLinkKind) =>
-    setLinks((ls) => [...ls, { row, itemId, kind, factor: 1 }]);
+    setLinks((ls) => {
+      const item = byId.get(itemId);
+      const factor = item && rows[row] ? lineFactor(item, rows[row]) : 1;
+      return [...ls, { row, itemId, kind, factor }];
+    });
 
   function apply() {
     onApply(
@@ -70,7 +82,7 @@ export function PriceMatchReview({ items, rows, initial, document, onApply, onCa
         sources: r.links.map((l) => {
           const row = rows[l.row]!;
           return {
-            document: document.slice(0, 200),
+            document: (row.source || document).slice(0, 200),
             reference: (row.reference ?? '').slice(0, 120),
             description: row.description.slice(0, 500),
             currency: row.currency,
@@ -123,7 +135,8 @@ export function PriceMatchReview({ items, rows, initial, document, onApply, onCa
                       <input
                         type="checkbox"
                         aria-label={`Aplicar precio a ${it.description}`}
-                        checked={!skipped.has(r.itemId)}
+                        checked={!r.blocked && !skipped.has(r.itemId)}
+                        disabled={r.blocked}
                         onChange={(e) =>
                           setSkipped((s) => {
                             const n = new Set(s);
@@ -149,6 +162,9 @@ export function PriceMatchReview({ items, rows, initial, document, onApply, onCa
                             <span className="hint">
                               {' '}
                               · {fmtQty(row.quantity)} × {formatPrice(row.unitPrice, row.currency)}
+                              {factorText(l.factor)}
+                              {row.group ? ` · ${row.group}` : ''}
+                              {row.source ? ` · ${row.source}` : ''}
                             </span>{' '}
                             <button
                               type="button"
@@ -164,8 +180,8 @@ export function PriceMatchReview({ items, rows, initial, document, onApply, onCa
                       })}
                     </td>
                     <td className="num-out">
-                      {formatPrice(r.unitPrice, r.currency)}
-                      {it.unitPrice > 0 && Math.abs(it.unitPrice - r.unitPrice) > 0.5 ? (
+                      {r.blocked ? '—' : formatPrice(r.unitPrice, r.currency)}
+                      {!r.blocked && it.unitPrice > 0 && Math.abs(it.unitPrice - r.unitPrice) > 0.5 ? (
                         <div className="hint">antes {formatPrice(it.unitPrice, it.currency)}</div>
                       ) : null}
                     </td>
@@ -176,6 +192,11 @@ export function PriceMatchReview({ items, rows, initial, document, onApply, onCa
                       {r.warnings.map((w) => (
                         <div key={w} className="hint match-warning">
                           {w}
+                        </div>
+                      ))}
+                      {r.notes.map((n) => (
+                        <div key={n} className="hint">
+                          {n}
                         </div>
                       ))}
                     </td>
@@ -201,7 +222,7 @@ export function PriceMatchReview({ items, rows, initial, document, onApply, onCa
               <UnmatchedLine
                 key={u.row}
                 text={`${row.reference ? `${row.reference} · ` : ''}${row.description}`}
-                detail={`${fmtQty(row.quantity)} × ${formatPrice(row.unitPrice, row.currency)}`}
+                detail={`${fmtQty(row.quantity)} × ${formatPrice(row.unitPrice, row.currency)}${row.group ? ` · ${row.group}` : ''}${row.source ? ` · ${row.source}` : ''}`}
                 reason={u.reason}
                 options={items.map((i) => ({ id: i.id, label: label(i) }))}
                 onAssign={(itemId, kind) => assign(u.row, itemId, kind)}
@@ -212,11 +233,33 @@ export function PriceMatchReview({ items, rows, initial, document, onApply, onCa
       ) : null}
 
       {missing.length ? (
-        <div className="match-section">
-          <b>Ítems del Excel sin precio en este documento ({missing.length})</b>
-          <div className="hint">{missing.map((m) => label(byId.get(m.itemId)!)).join(' · ')}</div>
+        <div className="match-section" role="alert">
+          <b>
+            Sin coincidencia en {document} ({missing.length} {missing.length === 1 ? 'ítem' : 'ítems'}) — no
+            se crean ítems nuevos; quedan sin precio
+          </b>
+          <ul className="match-missing">
+            {missing.map((m) => {
+              const it = byId.get(m.itemId)!;
+              return (
+                <li key={m.itemId}>
+                  {it.clientRef ? <b>Ítem {it.clientRef}</b> : <b>Ítem</b>} · {it.description}
+                  {it.group ? ` (${it.group})` : ''}
+                  {it.unitPrice > 0 ? (
+                    <span className="hint"> · conserva su precio actual</span>
+                  ) : (
+                    <span className="hint"> · no encontré esta línea en los documentos</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </div>
-      ) : null}
+      ) : (
+        <div className="hint" style={{ marginTop: 8 }}>
+          ✓ Todos los ítems de la cotización encontraron su precio en {document}.
+        </div>
+      )}
     </div>
   );
 }

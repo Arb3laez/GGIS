@@ -78,17 +78,26 @@ export function PaymentPlanEditor() {
 
   return (
     <div className="pay-plan">
-      <div className="table-wrap">
-        <table className="items-table pay-table">
+      <div className="pay-wrap">
+        <table className="pay-table">
+          <colgroup>
+            <col style={{ width: '17%' }} />
+            <col style={{ width: '19%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '9%' }} />
+            <col style={{ width: '19%' }} />
+            <col style={{ width: '14%' }} />
+            <col style={{ width: 40 }} />
+          </colgroup>
           <thead>
             <tr>
               <th>Tipo</th>
               <th>Concepto</th>
               <th>Cuándo</th>
-              <th style={{ width: 90 }}>%</th>
+              <th>%</th>
               <th>Sobre</th>
               <th style={{ textAlign: 'right' }}>Valor</th>
-              <th className="row-actions" />
+              <th aria-label="Acciones" />
             </tr>
           </thead>
           <tbody>
@@ -173,14 +182,15 @@ export function PaymentPlanEditor() {
                   ) : null}
                   <div className="hint">base {formatCop(r.baseAmount)}</div>
                 </td>
-                <td style={{ textAlign: 'right', fontWeight: 700, whiteSpace: 'nowrap' }}>
+                <td className="pay-amount">
                   {formatCop(r.amount)}
                   <div className="hint">{r.shareOfTotal.toFixed(1)}% del total</div>
                 </td>
-                <td className="row-actions">
+                <td className="pay-remove">
                   <button
                     type="button"
-                    className="icon-btn"
+                    className="icon-btn sm"
+                    title={`Quitar ${r.concept}`}
                     aria-label={`Quitar ${r.concept}`}
                     onClick={() =>
                       editPlan(

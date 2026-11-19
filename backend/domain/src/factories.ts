@@ -148,6 +148,8 @@ export function createEmptyDraft(now: Date = new Date()): QuoteDraft {
     issueDate: todayIso(now),
     validDays: 30,
     exchangeRate: 4100,
+    exchangeRateOn: null,
+    exchangeRateSource: null,
     importCostPct: 8,
     items: [blankItem()],
     staff: defaultStaff(),

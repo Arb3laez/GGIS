@@ -64,7 +64,13 @@ export function parseTextLines(text: string): ImportedRow[] {
       const v1 = parseNumber(a![0]);
       const v2 = parseNumber(b![0]);
       if (v2 <= 0) continue;
-      out.push({ description: desc, unit: 'UN', quantity: v1 > 0 ? v1 : 1, currency: guessCurrency(v2, line), unitPrice: v2 });
+      out.push({
+        description: desc,
+        unit: 'UN',
+        quantity: v1 > 0 ? v1 : 1,
+        currency: guessCurrency(v2, line),
+        unitPrice: v2,
+      });
       continue;
     }
 
@@ -101,7 +107,14 @@ export function parseTextLines(text: string): ImportedRow[] {
     } else if (isPipe) {
       unit = 'ML';
     }
-    out.push({ description: desc, unit, quantity: qty, currency: guessCurrency(price, line), unitPrice: price, ...(note ? { note } : {}) });
+    out.push({
+      description: desc,
+      unit,
+      quantity: qty,
+      currency: guessCurrency(price, line),
+      unitPrice: price,
+      ...(note ? { note } : {}),
+    });
   }
   return out;
 }
@@ -180,7 +193,7 @@ export function parseSheetRows(aoa: unknown[][]): ImportedRow[] {
     const price = priceIdx > -1 ? parseNumber(row[priceIdx]) : 0;
     const ref = refIdx > -1 ? cellText(row[refIdx]).trim().slice(0, 20) : '';
     // Si la hoja tiene columna de cantidad o precio, la fila debe traer al menos uno. Una fila
-    // solo con texto (sin nº, cantidad ni precio) es el título de un grupo: "TORRE MAR".
+    // solo con texto (sin nº, cantidad ni precio) es el título de un grupo: "TORRE A".
     if ((qtyIdx > -1 || priceIdx > -1) && qty <= 0 && price <= 0) {
       if (!ref) group = desc.slice(0, 120);
       continue;
@@ -190,7 +203,8 @@ export function parseSheetRows(aoa: unknown[][]): ImportedRow[] {
       ...(group ? { group } : {}),
       description: desc.slice(0, 500),
       unit: unitIdx > -1 ? cellText(row[unitIdx]).trim().slice(0, 20) || 'UN' : 'UN',
-      quantity: qty > 0 ? qty : 1,
+      // Excel guarda 779,51 como 779.5100000000001: se redondea a 4 decimales.
+      quantity: qty > 0 ? Math.round(qty * 10_000) / 10_000 : 1,
       currency: price > 0 ? guessCurrency(price, `${headerTxt} ${desc}`) : 'COP',
       unitPrice: price,
     });

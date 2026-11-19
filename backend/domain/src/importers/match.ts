@@ -22,7 +22,12 @@ export interface MatchTargetItem {
   clientRef?: string | null;
 }
 
-export type MatchLinkKind = 'direct' | 'shared' | 'component';
+/**
+ * direct: la línea es el ítem · shared: la línea se reparte entre varios ítems · component: se
+ * suma (base, módulo de expansión) · reference: precio tomado de la línea de OTRO grupo porque el
+ * proveedor no cotizó ese equipo para este grupo.
+ */
+export type MatchLinkKind = 'direct' | 'shared' | 'component' | 'reference';
 
 export interface MatchLink {
   /** Índice de la línea del proveedor. */
@@ -43,6 +48,10 @@ export interface ItemPriceMatch {
   currency: Currency;
   status: ItemMatchStatus;
   warnings: string[];
+  /** Información que no exige revisión (p. ej. "precio compartido con el ítem 4"). */
+  notes: string[];
+  /** No se puede aplicar: mezcla COP y USD y no hay TRM para convertir. */
+  blocked?: boolean;
 }
 
 export interface UnmatchedRow {
@@ -260,6 +269,29 @@ export function proposeLinks(items: MatchTargetItem[], rows: ImportedRow[]): Mat
     if (!isAccessory(ri)) return;
     const kinds = Object.keys(ACCESSORY_HOSTS).filter((k) => rp[ri]!.core.has(k));
     const hosts = new Set(kinds.flatMap((k) => ACCESSORY_HOSTS[k]!));
+
+    // Si la lista del cliente trae el accesorio como ítem propio ("Base para detector"), va ahí.
+    let ownId: string | null = null;
+    let ownScore = -Infinity;
+    for (let ii = 0; ii < items.length; ii++) {
+      const item = items[ii]!;
+      const core = ip[ii]!.core;
+      if (usedItems.has(item.id) || !kinds.some((k) => core.has(k)) || [...core].some((w) => hosts.has(w)))
+        continue;
+      const g = groupRelation(ip[ii]!, rp[ri]!);
+      if (g < 0) continue;
+      const s = g + (sameQuantity(item.quantity, row.quantity) ? 2 : 0);
+      if (s > ownScore) {
+        ownScore = s;
+        ownId = item.id;
+      }
+    }
+    if (ownId) {
+      usedItems.add(ownId);
+      links.push({ row: ri, itemId: ownId, kind: 'direct', factor: 1 });
+      return;
+    }
+
     let bestId: string | null = null;
     let bestScore = -Infinity;
     for (let ii = 0; ii < items.length; ii++) {
@@ -279,10 +311,76 @@ export function proposeLinks(items: MatchTargetItem[], rows: ImportedRow[]): Mat
   return links;
 }
 
-// ---------------------------------------------------------------- Evaluación
+// ---------------------------------------------------------------- Ajustes de las relaciones
 
 const fmtQty = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2).replace('.', ','));
+const fmtMoney = (n: number) => n.toLocaleString('es-CO', { maximumFractionDigits: 2 });
 const PIPE_LENGTH = /(\d+(?:[.,]\d+)?)\s*(m|mt|mts|metros)\b/i;
+const METER_UNIT = /^(m|ml|mt|mts|metros?|mtl)$/i;
+
+/** Largo del tubo (m) si la línea del proveedor es una tubería que se vende por tubo y no por metro. */
+function pipeLength(row: ImportedRow): number | null {
+  if (METER_UNIT.test(row.unit.trim()) || !profile(row.description).core.has('pipe')) return null;
+  const m = row.description.match(PIPE_LENGTH);
+  const len = m ? Number(m[1]!.replace(',', '.')) : 0;
+  return len > 1 ? len : null;
+}
+
+/** El ítem del cliente se mide en metros (unidad en metros o cantidad con decimales). */
+const inMeters = (item: MatchTargetItem) =>
+  METER_UNIT.test(item.unit.trim()) || !Number.isInteger(Math.round(item.quantity * 1000) / 1000);
+
+/**
+ * Unidades de la línea por cada unidad del ítem. Si el cliente pide metros de tubería y el
+ * proveedor vende tubos de 3 m, cada metro es 1/3 de tubo (el precio queda por metro).
+ */
+export function lineFactor(item: MatchTargetItem, row: ImportedRow): number {
+  const len = pipeLength(row);
+  return len && profile(item.description).core.has('pipe') && inMeters(item) ? 1 / len : 1;
+}
+
+/**
+ * Completa las relaciones (de las reglas o de la IA):
+ * - Pone el factor de tubo → metro donde la relación vino con factor 1.
+ * - Si de un equipo solo llegó el accesorio (la base) y el mismo equipo sí está cotizado para otro
+ *   grupo (otra torre), toma ese precio como referencia para no dejar el ítem incompleto.
+ */
+export function completeLinks(
+  items: MatchTargetItem[],
+  rows: ImportedRow[],
+  links: MatchLink[],
+): MatchLink[] {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const out = links.map((l) => {
+    const item = byId.get(l.itemId);
+    const row = rows[l.row];
+    return item && row && l.factor === 1 && l.kind !== 'reference'
+      ? { ...l, factor: lineFactor(item, row) }
+      : l;
+  });
+
+  const ip = new Map(items.map((i) => [i.id, profile(i.description, i.group)]));
+  const sameEquipment = (a: Profile, b: Profile) =>
+    a.core.size > 0 && a.core.size === b.core.size && [...a.core].every((w) => b.core.has(w));
+  for (const item of items) {
+    const own = out.filter((l) => l.itemId === item.id);
+    if (!own.length || own.some((l) => l.kind !== 'component')) continue;
+    const mine = ip.get(item.id)!;
+    // Otro ítem del mismo equipo (otro grupo) con su línea principal y los mismos accesorios.
+    const twin = items.find(
+      (o) =>
+        o.id !== item.id &&
+        sameEquipment(mine, ip.get(o.id)!) &&
+        out.some((l) => l.itemId === o.id && (l.kind === 'direct' || l.kind === 'shared')),
+    );
+    if (!twin) continue;
+    for (const l of out.filter((x) => x.itemId === twin.id && (x.kind === 'direct' || x.kind === 'shared')))
+      out.push({ row: l.row, itemId: item.id, kind: 'reference', factor: 1 });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------- Evaluación
 
 /**
  * Calcula el precio de cada ítem con las relaciones dadas (de la IA o de las reglas) y revisa
@@ -293,6 +391,8 @@ export function evaluateLinks(
   rows: ImportedRow[],
   rawLinks: MatchLink[],
   method: 'ai' | 'rules',
+  /** TRM (COP por USD) para sumar líneas en monedas distintas. */
+  exchangeRate?: number,
 ): PriceMatchResult {
   const ids = new Set(items.map((i) => i.id));
   const seen = new Set<string>();
@@ -312,13 +412,36 @@ export function evaluateLinks(
   const result: ItemPriceMatch[] = items.map((item) => {
     const own = links.filter((l) => l.itemId === item.id);
     if (!own.length) {
-      return { itemId: item.id, links: [], unitPrice: 0, currency: 'COP', status: 'none', warnings: [] };
+      return {
+        itemId: item.id,
+        links: [],
+        unitPrice: 0,
+        currency: 'COP',
+        status: 'none',
+        warnings: [],
+        notes: [],
+      };
     }
     const warnings: string[] = [];
+    const notes: string[] = [];
     const currencies = new Set(own.map((l) => rows[l.row]!.currency));
-    const currency = rows[own[0]!.row]!.currency;
-    if (currencies.size > 1) warnings.push('Las líneas asociadas vienen en monedas distintas (COP y USD).');
-    const unitPrice = own.reduce((acc, l) => acc + rows[l.row]!.unitPrice * l.factor, 0);
+    const mixed = currencies.size > 1;
+    const rate = exchangeRate && Number.isFinite(exchangeRate) && exchangeRate > 0 ? exchangeRate : 0;
+    // Con monedas mezcladas todo se lleva a pesos con la TRM; sin TRM el ítem no se puede aplicar.
+    const currency: Currency = mixed ? 'COP' : rows[own[0]!.row]!.currency;
+    const blocked = mixed && !rate;
+    if (mixed) {
+      warnings.push(
+        rate
+          ? `Las líneas vienen en COP y USD: se convirtieron a pesos con TRM ${fmtQty(rate)}.`
+          : 'Las líneas vienen en COP y USD y no hay TRM para convertirlas: este ítem no se aplica.',
+      );
+    }
+    const toCurrency = (price: number, from: Currency) =>
+      !mixed || from === currency ? price : from === 'USD' ? price * rate : price / rate;
+    const unitPrice = blocked
+      ? 0
+      : own.reduce((acc, l) => acc + toCurrency(rows[l.row]!.unitPrice, rows[l.row]!.currency) * l.factor, 0);
     const iprof = ip.get(item.id)!;
 
     const mains = own.filter((l) => l.kind !== 'component');
@@ -330,13 +453,40 @@ export function evaluateLinks(
     for (const l of own) {
       const row = rows[l.row]!;
       const rprof = profile(row.description, row.group);
+      const len = row.description.match(PIPE_LENGTH);
+      const tube = len ? Number(len[1]!.replace(',', '.')) : 0;
+      const perMeter = l.factor < 1 && tube > 1 && iprof.core.has('pipe');
+
+      if (l.kind === 'reference') {
+        warnings.push(
+          `El proveedor no cotizó este equipo${item.group ? ` para ${item.group}` : ''}: se tomó el precio de su línea${row.group ? ` de ${row.group}` : ''} (${row.reference || row.description.slice(0, 40)}). Pídele que agregue ${fmtQty(item.quantity)} unidades.`,
+        );
+        continue;
+      }
+
+      if (perMeter) {
+        // Tubería: el cliente pide metros y el proveedor vende tubos.
+        const price = toCurrency(row.unitPrice, row.currency);
+        notes.push(
+          `Precio por metro: tubo de ${fmtQty(tube)} m a $${fmtMoney(price)} → $${fmtMoney(price / tube)} por metro.`,
+        );
+        const needed = Math.ceil(item.quantity / tube - 1e-9);
+        if (l.kind !== 'shared' && Math.abs(row.quantity - needed) > Math.max(1, needed * 0.05)) {
+          const ratio = row.quantity / item.quantity;
+          const comma = Math.abs(ratio - 10) < 0.2 || Math.abs(ratio - 0.1) < 0.002;
+          warnings.push(
+            `El proveedor cotizó ${fmtQty(row.quantity)} tubos (${fmtQty(row.quantity * tube)} m) y para ${fmtQty(item.quantity)} m bastan ${fmtQty(needed)} tubos: pide corregir la cantidad${comma ? ` (o confirma la cantidad del cliente: ${fmtQty(row.quantity)} frente a ${fmtQty(item.quantity)} parece un error de coma)` : ''}.`,
+          );
+        }
+      }
+
       // Cantidad: en un reparto se compara contra la suma de los ítems que comparten la línea.
       const sharers = l.kind === 'shared' ? (byRow.get(l.row) ?? []).filter((x) => x.kind === 'shared') : [l];
       const expected = sharers.reduce(
         (acc, x) => acc + (items.find((i) => i.id === x.itemId)?.quantity ?? 0) * x.factor,
         0,
       );
-      if (expected > 0 && !sameQuantity(row.quantity, expected)) {
+      if (!perMeter && expected > 0 && !sameQuantity(row.quantity, expected)) {
         const ratio = row.quantity / expected;
         const comma = Math.abs(ratio - 10) < 0.2 || Math.abs(ratio - 0.1) < 0.002;
         warnings.push(
@@ -350,7 +500,9 @@ export function evaluateLinks(
           .filter((x): x is MatchTargetItem => !!x)
           .map(label);
         if (others.length)
-          warnings.push(`Precio compartido con ${others.join(', ')} (misma línea del proveedor).`);
+          notes.push(
+            `Línea compartida con ${others.join(', ')}: el proveedor cotizó ${fmtQty(row.quantity)} en una sola línea.`,
+          );
       }
       if (iprof.material && rprof.material && iprof.material !== rprof.material) {
         warnings.push(
@@ -362,10 +514,9 @@ export function evaluateLinks(
           `Diámetro distinto: el Excel pide ${iprof.diameter}" y el proveedor cotizó ${rprof.diameter}".`,
         );
       }
-      const len = row.description.match(PIPE_LENGTH);
-      if (iprof.core.has('pipe') && len && row.unit.toUpperCase() !== 'ML') {
+      if (!perMeter && tube > 1 && iprof.core.has('pipe') && !METER_UNIT.test(row.unit.trim())) {
         warnings.push(
-          `El proveedor cotiza por tubo de ${len[1]} m. Si la cantidad del Excel está en metros, se necesitan ${fmtQty(Math.ceil(item.quantity / Number(len[1]!.replace(',', '.'))))} tubos, no ${fmtQty(row.quantity)}.`,
+          `El proveedor cotiza por tubo de ${fmtQty(tube)} m. Si la cantidad del Excel está en metros, se necesitan ${fmtQty(Math.ceil(item.quantity / tube))} tubos, no ${fmtQty(row.quantity)}.`,
         );
       }
     }
@@ -376,6 +527,8 @@ export function evaluateLinks(
       currency,
       status: warnings.length ? 'review' : 'ok',
       warnings,
+      notes,
+      ...(blocked ? { blocked: true } : {}),
     };
   });
 
@@ -412,5 +565,5 @@ export function evaluateLinks(
 
 /** Asociación completa con reglas (sin IA). */
 export function matchPrices(items: MatchTargetItem[], rows: ImportedRow[]): PriceMatchResult {
-  return evaluateLinks(items, rows, proposeLinks(items, rows), 'rules');
+  return evaluateLinks(items, rows, completeLinks(items, rows, proposeLinks(items, rows)), 'rules');
 }

@@ -155,6 +155,22 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
   const serviceLabel = q.serviceType ? SERVICE_TYPE_LABELS[q.serviceType] : '';
   const unitLine = [unitLabel, serviceLabel].filter(Boolean).join(' · ') || 'Solución integral';
   const validUntil = formatLongDate(addDaysIso(q.issueDate, q.validDays));
+  // TRM usada para los precios: valor, fecha de vigencia y origen.
+  const trmValue = `$${q.exchangeRate.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const trmOn = q.exchangeRateOn ?? null;
+  const trmSource =
+    q.exchangeRateSource === 'trm-oficial'
+      ? 'TRM oficial'
+      : q.exchangeRateSource === 'mercado'
+        ? 'tasa de mercado'
+        : 'TRM';
+  const trmWhen = trmOn
+    ? ` (${trmSource} del ${formatLongDate(trmOn)})`
+    : ' (al momento de elaborar la oferta)';
+  const hasUsd = items.some((b) => b.isBillable && q.items.find((i) => i.id === b.id)?.currency === 'USD');
+  const trmText = hasUsd
+    ? `Los precios de los equipos cotizados en dólares se calcularon con una TRM de ${trmValue}${trmWhen}. Si la TRM varía significativamente antes de la orden de compra, los valores podrán ajustarse.`
+    : `TRM de referencia al elaborar la oferta: ${trmValue}${trmWhen}.`;
   const itemPages = billable.length ? chunk(billable, ITEMS_PER_PAGE) : [[]];
   // Plan de pagos por cortes (anticipos, cortes de obra, pago final) con su valor en pesos.
   const schedule = paymentSchedule(q, breakdown);
@@ -568,6 +584,14 @@ export function ProposalDocument({ quote: q, company }: { quote: Quote; company:
                   <p className="pp-note">
                     Valores en pesos colombianos. Oferta válida hasta el {validUntil}. Los precios están
                     sujetos a cambios si cambian las especificaciones o el alcance.
+                  </p>
+                  {/* TRM con la que se calcularon los precios al crear la oferta (se cambia en el cotizador). */}
+                  <p
+                    className="pp-note pp-trm"
+                    contentEditable={false}
+                    title="Se cambia en el cotizador (Ítems → TRM del día)"
+                  >
+                    {trmText}
                   </p>
                 </>
               ) : null}

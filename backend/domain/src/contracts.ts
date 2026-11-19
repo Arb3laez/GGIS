@@ -31,6 +31,8 @@ export interface QuoteSummary {
   closeDate: string | null;
   /** Observación del seguimiento. */
   note: string;
+  /** Observación escrita para la etapa actual. */
+  stageNote: string;
   issueDate: string;
   validDays: number;
   status: QuoteStatus;

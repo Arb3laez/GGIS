@@ -125,7 +125,13 @@ export function NumberField({
 }) {
   return (
     <Field label={label} hint={hint}>
-      <NumberInput className="" value={value} step={step} format={format} onChange={(n) => onChange(n ?? 0)} />
+      <NumberInput
+        className=""
+        value={value}
+        step={step}
+        format={format}
+        onChange={(n) => onChange(n ?? 0)}
+      />
     </Field>
   );
 }
@@ -135,15 +141,22 @@ export function TextArea({
   value,
   onChange,
   rows = 3,
+  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   rows?: number;
+  placeholder?: string;
 }) {
   return (
     <Field label={label}>
-      <textarea rows={rows} value={value} onChange={(e) => onChange(e.target.value)} />
+      <textarea
+        rows={rows}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
     </Field>
   );
 }

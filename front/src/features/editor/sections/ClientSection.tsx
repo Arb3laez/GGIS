@@ -9,16 +9,12 @@ import {
   QUOTE_STATUS_LABELS,
   SEND_STATUS_LABELS,
   SERVICE_TYPE_LABELS,
-  TEMPERATURE_LABELS,
-  TRANSACTION_TYPE_LABELS,
   type BusinessUnit,
   type Complexity,
   type LossReason,
   type QuoteStatus,
   type SendStatus,
   type ServiceType,
-  type Temperature,
-  type TransactionType,
 } from '@ggis/domain';
 import { UserRound } from 'lucide-react';
 import { useHistory } from '../../../api/queries';
@@ -45,7 +41,9 @@ function stageOptions(current: string | null): Array<[string, string]> {
 
 function stageHint(stage: string | null, since: string | null): string {
   const st = findStage(stage);
-  const parts = [st?.pct != null ? `Probabilidad de cierre ${st.pct}%` : 'Probabilidad de cierre sin definir'];
+  const parts = [
+    st?.pct != null ? `Probabilidad de cierre ${st.pct}%` : 'Probabilidad de cierre sin definir',
+  ];
   if (stage && since) parts.push(`desde el ${since}`);
   return parts.join(' · ');
 }
@@ -167,6 +165,7 @@ export function ClientSection() {
             hint={stageHint(d.stage, d.stageUpdatedOn)}
           />
         </div>
+        <StageNotes />
         {d.status === 'lost' ? (
           <SelectField<LossReason>
             label="Motivo de la pérdida"
@@ -202,14 +201,7 @@ export function ClientSection() {
       </div>
 
       <div className="section-title">Seguimiento comercial</div>
-      <div className="grid-3">
-        <SelectField<Temperature>
-          label="Temperatura"
-          value={d.followUp.temperature}
-          emptyLabel="Sin temperatura"
-          options={entries(TEMPERATURE_LABELS)}
-          onChange={(v) => edit((x) => void (x.followUp.temperature = v))}
-        />
+      <div className="grid-2">
         <SelectField<SendStatus>
           label="Estado de envío"
           value={d.followUp.sendStatus}
@@ -223,20 +215,62 @@ export function ClientSection() {
           value={d.followUp.closeDate ?? ''}
           onChange={(v) => edit((x) => void (x.followUp.closeDate = v || null))}
         />
-        <SelectField<TransactionType>
-          label="Tipo de transacción"
-          value={d.transactionType}
-          options={entries(TRANSACTION_TYPE_LABELS)}
-          onChange={(v) => edit((x) => void (x.transactionType = v ?? 'quote'))}
-        />
       </div>
       <TextArea
-        label="Observación"
+        label="Observación general"
         value={d.followUp.note}
         rows={2}
         onChange={(v) => edit((x) => void (x.followUp.note = v))}
       />
     </section>
+  );
+}
+
+/** Nombre de la etapa con su porcentaje: "Cierre este mes (80%)". */
+const stageName = (value: string) => {
+  const s = findStage(value);
+  return s ? (s.pct != null ? `${s.label} (${s.pct}%)` : s.label) : value;
+};
+
+/**
+ * Observación por etapa: se escribe la de la etapa elegida en "Nivel de oferta" y quedan a la
+ * vista las que se escribieron en las otras etapas (historial del seguimiento).
+ */
+function StageNotes() {
+  const d = useDraft();
+  const edit = useEdit();
+  const notes = d.followUp.stageNotes ?? {};
+  const others = Object.entries(notes).filter(([k, v]) => k !== d.stage && v.trim());
+  return (
+    <div className="stage-notes">
+      {d.stage ? (
+        <TextArea
+          label={`Observación de la etapa · ${stageName(d.stage)}`}
+          value={notes[d.stage] ?? ''}
+          rows={2}
+          placeholder="Ej. El cliente confirma la orden de compra la próxima semana"
+          onChange={(v) =>
+            edit((x) => {
+              const stage = x.stage;
+              if (!stage) return;
+              x.followUp.stageNotes = { ...(x.followUp.stageNotes ?? {}), [stage]: v };
+              if (!v.trim()) delete x.followUp.stageNotes[stage];
+            })
+          }
+        />
+      ) : (
+        <div className="hint">Elige el nivel de oferta (etapa) para escribir su observación.</div>
+      )}
+      {others.length ? (
+        <ul className="stage-notes__list">
+          {others.map(([k, v]) => (
+            <li key={k}>
+              <b>{stageName(k)}:</b> {v}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
   );
 }
 

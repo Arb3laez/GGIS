@@ -23,6 +23,7 @@ export function ImportPanel() {
   const caps = useImportCapabilities();
   const sheetInput = useRef<HTMLInputElement>(null);
   const docInput = useRef<HTMLInputElement>(null);
+  const allInput = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
   const [preview, setPreview] = useState<PreviewRow[]>([]);
@@ -30,6 +31,8 @@ export function ImportPanel() {
   const [pasteText, setPasteText] = useState('');
   const [docName, setDocName] = useState('');
   const [match, setMatch] = useState<{ result: PriceMatchResult; rows: ImportedRow[] } | null>(null);
+  /** Aviso persistente: ítems sin coincidencia en los PDF después de aplicar precios. */
+  const [unpriced, setUnpriced] = useState<{ docs: string; items: string[] } | null>(null);
   const draft = useDraft();
   const existing = draft.items.filter((i) => i.description.trim());
   const canMatch = existing.length > 0 && preview.some((r) => r.selected && r.unitPrice > 0);
@@ -45,6 +48,108 @@ export function ImportPanel() {
       setStatus(res.message);
     } catch (err) {
       setStatus('');
+      notify(errorMessage(err), true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Carga varios archivos a la vez: la lista del cliente (Excel sin precios) crea los ítems si la
+   * cotización está vacía, y las cotizaciones de proveedor (PDF, Excel con precios, imágenes) se
+   * relacionan todas juntas con esos ítems para revisar y aplicar los precios de una vez.
+   */
+  async function loadAll(files: File[]) {
+    setBusy(true);
+    setMatch(null);
+    setPreview([]);
+    setUnpriced(null);
+    const summary: string[] = [];
+    try {
+      const clientLists: Array<{ name: string; rows: ImportedRow[] }> = [];
+      const supplierRows: ImportedRow[] = [];
+      const supplierNames: string[] = [];
+      for (const [i, f] of files.entries()) {
+        setStatus(`Leyendo ${i + 1} de ${files.length}: ${f.name}…`);
+        const isSheet = /\.(xlsx|xls|csv)$/i.test(f.name);
+        try {
+          const res = isSheet ? await importsApi.spreadsheet(f) : await importsApi.document(f, quoteId);
+          if (!isSheet && res.attachment && quoteId)
+            void qc.invalidateQueries({ queryKey: keys.attachments(quoteId) });
+          const priced = res.rows.filter((r) => r.unitPrice > 0).length;
+          if (!res.rows.length) {
+            summary.push(`${f.name}: sin ítems`);
+          } else if (isSheet && priced < res.rows.length * 0.4) {
+            clientLists.push({ name: f.name, rows: res.rows });
+            summary.push(`${f.name}: lista del cliente (${res.rows.length} ítems)`);
+          } else {
+            supplierRows.push(
+              ...res.rows.filter((r) => r.unitPrice > 0).map((r) => ({ ...r, source: f.name })),
+            );
+            supplierNames.push(f.name);
+            const ok = /cuadra con el subtotal/.test(res.message) ? ' ✓ cuadra con el subtotal' : '';
+            summary.push(`${f.name}: ${priced} líneas con precio${ok}`);
+          }
+        } catch (err) {
+          summary.push(`${f.name}: ${errorMessage(err)}`);
+        }
+      }
+
+      // Ítems a los que se les pone precio: los de la cotización o los de la lista del cliente.
+      let targets = existing.map((i) => ({
+        id: i.id,
+        description: i.description,
+        unit: i.unit,
+        quantity: i.quantity,
+        group: i.group ?? null,
+        clientRef: i.clientRef ?? null,
+      }));
+      const list = clientLists[0];
+      if (list && targets.length) {
+        summary.push(
+          `La cotización ya tiene ${targets.length} ítems: no se volvió a cargar ${list.name} (para no duplicar)`,
+        );
+      } else if (list) {
+        summary.push(`Se crearon ${list.rows.length} ítems desde ${list.name}`);
+        const created = list.rows.map((r) => ({
+          ...blankItem(r.description, r.unit || 'UN'),
+          quantity: r.quantity,
+          currency: r.currency,
+          unitPrice: r.unitPrice,
+          ...(r.clientRef ? { clientRef: r.clientRef } : {}),
+          ...(r.group ? { group: r.group } : {}),
+        }));
+        edit((x) => {
+          const onlyBlank = x.items.length === 1 && !x.items[0]!.description.trim();
+          x.items = onlyBlank ? created : [...x.items, ...created];
+        });
+        targets = created.map((i) => ({
+          id: i.id,
+          description: i.description,
+          unit: i.unit,
+          quantity: i.quantity,
+          group: i.group ?? null,
+          clientRef: i.clientRef ?? null,
+        }));
+      }
+
+      if (supplierRows.length && targets.length) {
+        setStatus('Relacionando las cotizaciones con los ítems…');
+        const result = await importsApi.match(targets, supplierRows);
+        setDocName(supplierNames.join(' + '));
+        setMatch({ result, rows: supplierRows });
+      } else if (supplierRows.length) {
+        // Cotización vacía: no hay a qué ponerle precio. Se muestran las líneas, pero solo se
+        // agregan como ítems si el usuario lo confirma.
+        setDocName(supplierNames.join(' + '));
+        setPreview(supplierRows.map((r) => ({ ...r, selected: true })));
+        summary.push(
+          'La cotización no tiene ítems: carga primero la lista del cliente (Excel) para ponerle precios a esos ítems',
+        );
+      }
+      setStatus(summary.join(' · '));
+    } catch (err) {
+      setStatus(summary.join(' · '));
       notify(errorMessage(err), true);
     } finally {
       setBusy(false);
@@ -106,9 +211,23 @@ export function ImportPanel() {
       }
     });
     setMatch(null);
+    // Ítems que siguen sin precio después de todos los documentos cargados hasta ahora.
+    const updated = new Set(updates.map((u) => u.itemId));
+    const left = existing
+      .filter((i) => !updated.has(i.id) && !(i.unitPrice > 0))
+      .map(
+        (i) =>
+          `${i.clientRef ? `Ítem ${i.clientRef}` : 'Ítem'} · ${i.description}${i.group ? ` (${i.group})` : ''}`,
+      );
+    setUnpriced({ docs: docName, items: left });
     const msg = `Se actualizó el precio de ${updates.length} ítems${docName ? ` con ${docName}` : ''}. No se agregaron ítems nuevos.`;
     setStatus(msg);
-    notify(msg);
+    notify(
+      left.length
+        ? `${msg} Ojo: ${left.length} ${left.length === 1 ? 'ítem no tiene' : 'ítems no tienen'} coincidencia en los PDF: ${left.slice(0, 3).join('; ')}${left.length > 3 ? '…' : ''}`
+        : `${msg} Todos los ítems quedaron con precio.`,
+      left.length > 0,
+    );
   }
 
   const setRow = (i: number, patch: Partial<PreviewRow>) =>
@@ -117,21 +236,48 @@ export function ImportPanel() {
   return (
     <div style={{ marginBottom: 14 }}>
       <div className="filters">
-        <button type="button" className="small" disabled={busy} onClick={() => sheetInput.current?.click()}>
-          Cargar Excel / CSV
+        <button
+          type="button"
+          className="small primary"
+          disabled={busy}
+          onClick={() => allInput.current?.click()}
+          title="Elige juntos la lista del cliente (Excel) y las cotizaciones de los proveedores (PDF o Excel): se crean los ítems y se les ponen los precios"
+        >
+          Cargar todos los archivos
+        </button>
+        <input
+          ref={allInput}
+          type="file"
+          hidden
+          multiple
+          accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.webp"
+          onChange={(e) => {
+            const files = [...(e.target.files ?? [])];
+            e.target.value = '';
+            if (files.length) void loadAll(files);
+          }}
+        />
+        <button
+          type="button"
+          className="small"
+          disabled={busy}
+          onClick={() => sheetInput.current?.click()}
+          title="La lista del cliente crea los ítems; un Excel de proveedor (con precios) solo pone precios"
+        >
+          Lista del cliente (Excel / CSV)
         </button>
         <button
           type="button"
           className="small"
           disabled={busy}
           onClick={() => docInput.current?.click()}
-          title={
+          title={`Pone los precios en los ítems que ya tiene la cotización (no crea ítems nuevos). ${
             caps.data?.ai
-              ? 'Se lee con IA en el servidor'
-              : 'La IA no está configurada: se lee el texto del PDF'
-          }
+              ? 'Si la tabla del PDF no cuadra con su subtotal, se lee con IA.'
+              : 'Se lee la tabla del PDF; la IA no está configurada.'
+          }`}
         >
-          Adjuntar PDF o imagen{caps.data?.ai ? ' (IA)' : ''}
+          Cotizaciones de proveedor (PDF)
         </button>
         <button type="button" className="small" disabled={busy} onClick={() => setPasteOpen((o) => !o)}>
           Pegar filas copiadas
@@ -143,35 +289,63 @@ export function ImportPanel() {
           ref={sheetInput}
           type="file"
           hidden
+          multiple
           accept=".xlsx,.xls,.csv"
           onChange={(e) => {
-            const f = e.target.files?.[0];
+            const files = [...(e.target.files ?? [])];
             e.target.value = '';
-            if (f) void run(() => importsApi.spreadsheet(f), f.name);
+            if (files.length) void loadAll(files);
           }}
         />
         <input
           ref={docInput}
           type="file"
           hidden
+          multiple
           accept=".pdf,.png,.jpg,.jpeg,.webp"
           onChange={(e) => {
-            const f = e.target.files?.[0];
+            const files = [...(e.target.files ?? [])];
             e.target.value = '';
-            if (!f) return;
+            if (!files.length) return;
             if (!quoteId)
               notify(
-                'Guarda la cotización para que el documento quede adjunto. Por ahora solo se leerán los ítems.',
+                'Guarda la cotización para que los PDF queden adjuntos. Por ahora solo se leen los precios.',
               );
-            void run(async () => {
-              const res = await importsApi.document(f, quoteId);
-              if (res.attachment && quoteId)
-                void qc.invalidateQueries({ queryKey: keys.attachments(quoteId) });
-              return res;
-            }, f.name);
+            void loadAll(files);
           }}
         />
       </div>
+
+      {unpriced?.items.length ? (
+        <div className="match-section match-unpriced" role="alert">
+          <div className="filters" style={{ justifyContent: 'space-between' }}>
+            <b>
+              {unpriced.items.length === 1
+                ? 'Este ítem no encontró ninguna coincidencia'
+                : `Estos ${unpriced.items.length} ítems no encontraron ninguna coincidencia`}{' '}
+              en los PDF agregados{unpriced.docs ? ` (${unpriced.docs})` : ''} y{' '}
+              {unpriced.items.length === 1 ? 'quedó' : 'quedaron'} sin precio:
+            </b>
+            <button
+              type="button"
+              className="match-remove"
+              aria-label="Cerrar aviso"
+              title="Cerrar aviso"
+              onClick={() => setUnpriced(null)}
+            >
+              ×
+            </button>
+          </div>
+          <ul className="match-missing">
+            {unpriced.items.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+          <div className="hint">
+            Agrega la cotización del proveedor que los incluya o ponles el precio a mano en la tabla de ítems.
+          </div>
+        </div>
+      ) : null}
 
       {pasteOpen ? (
         <div style={{ marginBottom: 12 }}>
@@ -315,6 +489,7 @@ export function ImportPanel() {
           rows={match.rows}
           initial={match.result}
           document={docName || 'cotización de proveedor'}
+          exchangeRate={draft.exchangeRate}
           onApply={applyPrices}
           onCancel={() => setMatch(null)}
         />
