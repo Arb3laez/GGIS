@@ -42,6 +42,18 @@ export const pricingMethodSchema = z.enum(PRICING_METHODS);
 export const paymentModeSchema = z.enum(PAYMENT_MODES);
 export const solutionSchema = z.enum(SOLUTIONS);
 
+/** Una línea de cotización de proveedor que aporta al precio de un ítem. */
+export const priceSourceSchema = z.object({
+  /** Archivo o proveedor de donde salió la línea. */
+  document: text(200),
+  reference: text(120),
+  description: text(500),
+  currency: currencySchema,
+  unitPrice: money,
+  /** Unidades de esta línea por cada unidad del ítem (1 = directo; se suman los componentes). */
+  factor: z.number().finite().positive().max(1_000),
+});
+
 export const quoteItemSchema = z.object({
   id,
   description: text(500),
@@ -67,6 +79,12 @@ export const quoteItemSchema = z.object({
   pipeLengthM: z.number().finite().positive().max(100).nullable().default(null),
   /** Detalle o notas del ítem para la oferta (sale debajo de la descripción). */
   notes: text(3_000).default(''),
+  /** Nº del ítem en la lista del cliente (p. ej. formato de licitación); vacío = ítem propio. */
+  clientRef: z.string().max(20).nullable().optional(),
+  /** Grupo o frente de la lista del cliente (p. ej. "TORRE MAR"). */
+  group: z.string().max(120).nullable().optional(),
+  /** Líneas de cotizaciones de proveedor con las que se armó el precio del ítem (trazabilidad). */
+  priceSources: z.array(priceSourceSchema).max(20).optional(),
 });
 
 export const overtimeHoursSchema = z.object({
@@ -405,6 +423,30 @@ export const importedRowSchema = z.object({
   currency: currencySchema,
   unitPrice: money,
   note: z.string().max(300).optional(),
+  /** Referencia o código del proveedor. */
+  reference: z.string().max(120).optional(),
+  /** Grupo o frente al que pertenece la fila (p. ej. "TORRE MAR"). */
+  group: z.string().max(120).optional(),
+  /** Nº de ítem en la lista del cliente (solo al leer la lista del cliente). */
+  clientRef: z.string().max(20).optional(),
+});
+
+/** Asociar las líneas de una cotización de proveedor a los ítems que ya tiene la cotización. */
+export const priceMatchRequestSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        id,
+        description: text(500),
+        unit: text(20),
+        quantity: money,
+        group: z.string().max(120).nullable().optional(),
+        clientRef: z.string().max(20).nullable().optional(),
+      }),
+    )
+    .min(1)
+    .max(2_000),
+  rows: z.array(importedRowSchema).min(1).max(1_000),
 });
 
 export const companyProfileSchema = z.object({
@@ -423,6 +465,7 @@ export const companyProfileSchema = z.object({
 });
 
 export type QuoteItem = z.infer<typeof quoteItemSchema>;
+export type PriceSource = z.infer<typeof priceSourceSchema>;
 export type OvertimeHours = z.infer<typeof overtimeHoursSchema>;
 export type StaffMember = z.infer<typeof staffMemberSchema>;
 export type CostLine = z.infer<typeof costLineSchema>;

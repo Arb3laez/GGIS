@@ -1555,6 +1555,74 @@ section[id] {
   padding: 6px;
 }
 
+/* Asociar precios del proveedor a los ítems existentes */
+.match-review .scroll {
+  max-height: 460px;
+}
+.match-review td {
+  vertical-align: top;
+}
+.match-line {
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 2px 0;
+}
+.match-kind {
+  background: var(--info-bg);
+  color: var(--status-sent-ink);
+  padding: 1px 7px;
+  font-size: 10.5px;
+}
+.match-status-ok {
+  background: var(--ok-bg);
+  color: var(--ok);
+}
+.match-status-review {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.match-warning {
+  color: var(--warn);
+  margin-top: 2px;
+}
+.match-section {
+  margin-top: 12px;
+  background: var(--panel);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.match-unmatched {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.match-unmatched .filters {
+  margin: 0;
+}
+button.match-remove {
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  padding: 0 4px;
+  color: var(--text-3);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+button.match-remove:hover {
+  color: var(--danger);
+  background: none;
+}
+
 /* Notificaciones */
 .toast {
   position: fixed;

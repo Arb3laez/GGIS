@@ -24,8 +24,6 @@ import { useConfirm } from '../../shared/confirm';
 import { errorMessage, useToast } from '../../shared/feedback';
 import {
   Button,
-  FilterPills,
-  GYG_STATUSES,
   MONTH_OPTIONS,
   monthOf,
   PageHeader,
@@ -68,7 +66,6 @@ export function QuotesListPage() {
   const today = todayIso();
 
   const f = {
-    tab: params.get('status') ?? 'all',
     stage: params.get('stage') ?? 'all',
     q: params.get('q') ?? '',
     unit: params.get('unit') ?? '',
@@ -89,7 +86,6 @@ export function QuotesListPage() {
   const term = f.q.trim().toLowerCase();
   const shown = rows.filter(
     (r) =>
-      (f.tab === 'all' || toGygStatus(r.status) === f.tab) &&
       (f.stage === 'all' || r.stage === f.stage) &&
       (!f.unit || r.businessUnit === f.unit) &&
       (!f.svc || r.serviceType === f.svc) &&
@@ -100,14 +96,6 @@ export function QuotesListPage() {
       (!term || searchable(r).includes(term)),
   );
 
-  const statusOptions = [
-    { value: 'all', label: 'Todas', count: rows.length },
-    ...GYG_STATUSES.map((s) => ({
-      value: s.value,
-      label: s.label,
-      count: rows.filter((r) => toGygStatus(r.status) === s.value).length,
-    })),
-  ];
   const stageItems = FOLLOW_UP_STAGES.filter((s) => s.pct != null).map((s) => {
     const inStage = rows.filter((r) => r.stage === s.value);
     return {
@@ -271,7 +259,6 @@ export function QuotesListPage() {
       />
 
       <div className="gyg-filterbar">
-        <FilterPills options={statusOptions} value={f.tab} onChange={setParam('status')} />
         <div className="gyg-filterbar__row">
           <SearchField value={f.q} onChange={setParam('q')} placeholder="Cliente, NIT, proyecto, contacto, tel" />
           <SelectField

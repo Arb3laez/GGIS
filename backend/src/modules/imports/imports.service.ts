@@ -1,4 +1,12 @@
-import { parsePastedText, type ImportPreview } from '@ggis/domain';
+import {
+  evaluateLinks,
+  matchPrices,
+  parsePastedText,
+  type ImportedRow,
+  type ImportPreview,
+  type MatchTargetItem,
+  type PriceMatchResult,
+} from '@ggis/domain';
 import { badRequest } from '../../lib/errors';
 import type { Logger } from '../../lib/logger';
 import type { AttachmentsService } from '../attachments/attachments.service';
@@ -46,6 +54,26 @@ export class ImportsService {
           ? `Se detectaron ${rows.length} ítems (${withoutPrice} sin precio — parece una lista del cliente). Al elegir cada nombre del catálogo se autocompleta el precio si ya lo habías cotizado.`
           : `Se detectaron ${rows.length} ítems. Revísalos antes de importar.`,
     };
+  }
+
+  /**
+   * Relaciona las líneas de un proveedor con los ítems existentes (no crea ítems). Usa la IA si
+   * está configurada y, si falla o no está, las reglas del dominio. La evaluación (precios,
+   * cantidades, lo que no se relacionó) siempre la hace el dominio.
+   */
+  async matchPrices(items: MatchTargetItem[], rows: ImportedRow[]): Promise<PriceMatchResult> {
+    if (this.ai.enabled && this.ai.match) {
+      try {
+        const links = await this.ai.match(items, rows);
+        return evaluateLinks(items, rows, links, 'ai');
+      } catch (err) {
+        if (!(err instanceof AiExtractionError)) throw err;
+        this.log.warn({ reason: err.message }, 'Asociación con IA falló; se usan las reglas');
+        const res = matchPrices(items, rows);
+        return { ...res, message: `${res.message} (Se usaron las reglas: ${err.message})` };
+      }
+    }
+    return matchPrices(items, rows);
   }
 
   fromText(text: string): ImportPreview {

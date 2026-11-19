@@ -21,8 +21,6 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   DATA_DIR: z.string().default('./data'),
   WEB_DIST_DIR: z.string().optional(),
-  ANTHROPIC_API_KEY: z.string().optional(),
-  ANTHROPIC_MODEL: z.string().default('claude-opus-5-5'),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default('gpt-5'),
   OPENAI_IMAGE_MODEL: z.string().default('gpt-image-1.5'),
@@ -52,11 +50,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env) {
     databaseFile: path.join(dataDir, 'cotizador.sqlite'),
     attachmentsDir: path.join(dataDir, 'attachments'),
     webDistDir: e.WEB_DIST_DIR ? path.resolve(e.WEB_DIST_DIR) : undefined,
-    ai: {
-      // Vacío = extracción con IA deshabilitada (se usa el lector de texto del PDF).
-      apiKey: e.ANTHROPIC_API_KEY?.trim() || undefined,
-      model: e.ANTHROPIC_MODEL,
-    },
     research: {
       // Vacío = investigación de clientes con IA deshabilitada (quedan los botones de Google).
       apiKey: e.OPENAI_API_KEY?.trim() || undefined,

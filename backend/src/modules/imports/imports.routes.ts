@@ -2,6 +2,7 @@ import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import type { Multer } from 'multer';
 import { z } from 'zod';
+import { priceMatchRequestSchema } from '@ggis/domain';
 import { badRequest } from '../../lib/errors';
 import { validate } from '../../lib/validate';
 import type { ImportsService } from './imports.service';
@@ -36,6 +37,12 @@ export function importsRouter(imports: ImportsService, upload: Multer): Router {
     if (!req.file) throw badRequest('Falta el archivo (campo "file").');
     const { quoteId } = validate(documentFields, req.body ?? {});
     res.json(await imports.fromDocument(req.file.originalname, req.file.buffer, quoteId));
+  });
+
+  // Asociar precios del proveedor a los ítems existentes (puede usar IA: mismo límite).
+  r.post('/match', documentLimiter, async (req, res) => {
+    const { items, rows } = validate(priceMatchRequestSchema, req.body);
+    res.json(await imports.matchPrices(items, rows));
   });
 
   r.post('/text', (req, res) => {

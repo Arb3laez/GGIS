@@ -124,7 +124,8 @@ const cellText = (v: unknown) => (v === null || v === undefined ? '' : String(v)
 export function parseSheetRows(aoa: unknown[][]): ImportedRow[] {
   if (!aoa || aoa.length < 2) return [];
   const rowText = (i: number) => (aoa[i] ?? []).map((h) => cellText(h).toLowerCase()).join(' ');
-  const limit = Math.min(12, aoa.length);
+  // Los formatos de licitación traen un bloque de datos e instrucciones antes de la tabla.
+  const limit = Math.min(30, aoa.length);
   let headerIdx = -1;
   for (let i = 0; i < limit; i++) {
     const t = rowText(i);
@@ -162,8 +163,13 @@ export function parseSheetRows(aoa: unknown[][]): ImportedRow[] {
     'costo',
   ]);
   const headerTxt = headers.join(' ');
+  // Nº de ítem del cliente: columna "Item", "No." o "#" distinta de la descripción.
+  const refIdx = headers.findIndex(
+    (h, idx) => idx !== descIdx && /^(item|ítem|no\.?|n[º°o]\.?|#)$/i.test(h.trim()),
+  );
 
   const rows: ImportedRow[] = [];
+  let group = '';
   for (let i = headerIdx + 1; i < aoa.length; i++) {
     const row = aoa[i];
     if (!row) continue;
@@ -172,9 +178,16 @@ export function parseSheetRows(aoa: unknown[][]): ImportedRow[] {
     if (/^(total|subtotal|iva|descuento|neto|retefuente)/i.test(desc)) continue;
     const qty = qtyIdx > -1 ? parseNumber(row[qtyIdx]) : 0;
     const price = priceIdx > -1 ? parseNumber(row[priceIdx]) : 0;
-    // Si la hoja tiene columna de cantidad o precio, la fila debe traer al menos uno.
-    if ((qtyIdx > -1 || priceIdx > -1) && qty <= 0 && price <= 0) continue;
+    const ref = refIdx > -1 ? cellText(row[refIdx]).trim().slice(0, 20) : '';
+    // Si la hoja tiene columna de cantidad o precio, la fila debe traer al menos uno. Una fila
+    // solo con texto (sin nº, cantidad ni precio) es el título de un grupo: "TORRE MAR".
+    if ((qtyIdx > -1 || priceIdx > -1) && qty <= 0 && price <= 0) {
+      if (!ref) group = desc.slice(0, 120);
+      continue;
+    }
     rows.push({
+      ...(ref ? { clientRef: ref } : {}),
+      ...(group ? { group } : {}),
       description: desc.slice(0, 500),
       unit: unitIdx > -1 ? cellText(row[unitIdx]).trim().slice(0, 20) || 'UN' : 'UN',
       quantity: qty > 0 ? qty : 1,

@@ -1,16 +1,19 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { blankItem, type ImportedRow } from '@ggis/domain';
+import { blankItem, type ImportedRow, type PriceMatchResult } from '@ggis/domain';
 import { importsApi, keys, useImportCapabilities } from '../../../api/queries';
 import { errorMessage, useToast } from '../../../shared/feedback';
 import { formatPrice, NumberInput } from '../../../shared/inputs';
-import { useEdit, useEditor } from '../store';
+import { useDraft, useEdit, useEditor } from '../store';
+import { PriceMatchReview, type PriceUpdate } from './PriceMatchReview';
 
 type PreviewRow = ImportedRow & { selected: boolean };
 
 /**
  * Importar ítems desde Excel/CSV, PDF/imagen (con IA en el servidor) o filas pegadas.
- * Siempre muestra una previsualización editable antes de agregarlos.
+ * Siempre muestra una previsualización editable antes de agregarlos. Si la cotización ya tiene
+ * ítems (p. ej. la lista del cliente), los precios del proveedor se pueden ASOCIAR a esos ítems
+ * en vez de agregarlos como nuevos, para no duplicar.
  */
 export function ImportPanel() {
   const edit = useEdit();
@@ -25,9 +28,16 @@ export function ImportPanel() {
   const [preview, setPreview] = useState<PreviewRow[]>([]);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
+  const [docName, setDocName] = useState('');
+  const [match, setMatch] = useState<{ result: PriceMatchResult; rows: ImportedRow[] } | null>(null);
+  const draft = useDraft();
+  const existing = draft.items.filter((i) => i.description.trim());
+  const canMatch = existing.length > 0 && preview.some((r) => r.selected && r.unitPrice > 0);
 
-  async function run(task: () => Promise<{ rows: ImportedRow[]; message: string }>) {
+  async function run(task: () => Promise<{ rows: ImportedRow[]; message: string }>, name = '') {
     setBusy(true);
+    setMatch(null);
+    setDocName(name);
     setStatus('Leyendo…');
     try {
       const res = await task();
@@ -49,12 +59,56 @@ export function ImportPanel() {
         quantity: r.quantity,
         currency: r.currency,
         unitPrice: r.unitPrice,
+        ...(r.clientRef ? { clientRef: r.clientRef } : {}),
+        ...(r.group ? { group: r.group } : {}),
       }));
       const onlyBlank = x.items.length === 1 && !x.items[0]!.description.trim();
       x.items = onlyBlank ? items : [...x.items, ...items];
     });
     setPreview([]);
     setStatus(`Se importaron ${rows.length} ítems.`);
+  }
+
+  /** Relaciona las filas leídas con los ítems que ya tiene la cotización (sin crear ítems). */
+  async function associate() {
+    const rows = preview.filter((r) => r.selected && r.description.trim()).map(({ selected: _s, ...r }) => r);
+    setBusy(true);
+    setStatus('Relacionando con los ítems de la cotización…');
+    try {
+      const targets = existing.map((i) => ({
+        id: i.id,
+        description: i.description,
+        unit: i.unit,
+        quantity: i.quantity,
+        group: i.group ?? null,
+        clientRef: i.clientRef ?? null,
+      }));
+      const result = await importsApi.match(targets, rows);
+      setMatch({ result, rows });
+      setPreview([]);
+      setStatus('');
+    } catch (err) {
+      setStatus('');
+      notify(errorMessage(err), true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function applyPrices(updates: PriceUpdate[]) {
+    edit((x) => {
+      for (const u of updates) {
+        const it = x.items.find((i) => i.id === u.itemId);
+        if (!it) continue;
+        it.unitPrice = u.unitPrice;
+        it.currency = u.currency;
+        it.priceSources = u.sources;
+      }
+    });
+    setMatch(null);
+    const msg = `Se actualizó el precio de ${updates.length} ítems${docName ? ` con ${docName}` : ''}. No se agregaron ítems nuevos.`;
+    setStatus(msg);
+    notify(msg);
   }
 
   const setRow = (i: number, patch: Partial<PreviewRow>) =>
@@ -93,7 +147,7 @@ export function ImportPanel() {
           onChange={(e) => {
             const f = e.target.files?.[0];
             e.target.value = '';
-            if (f) void run(() => importsApi.spreadsheet(f));
+            if (f) void run(() => importsApi.spreadsheet(f), f.name);
           }}
         />
         <input
@@ -114,7 +168,7 @@ export function ImportPanel() {
               if (res.attachment && quoteId)
                 void qc.invalidateQueries({ queryKey: keys.attachments(quoteId) });
               return res;
-            });
+            }, f.name);
           }}
         />
       </div>
@@ -160,8 +214,19 @@ export function ImportPanel() {
               Ítems detectados — revisa y corrige antes de importar
             </b>
             <span style={{ display: 'flex', gap: 6 }}>
-              <button type="button" className="small primary" onClick={confirmImport}>
-                Importar seleccionados
+              {canMatch ? (
+                <button
+                  type="button"
+                  className="small primary"
+                  disabled={busy}
+                  title="Pone los precios en los ítems que ya tiene la cotización, sin duplicarlos"
+                  onClick={() => void associate()}
+                >
+                  Asociar precios a ítems existentes
+                </button>
+              ) : null}
+              <button type="button" className={canMatch ? 'small' : 'small primary'} onClick={confirmImport}>
+                {canMatch ? 'Agregar como ítems nuevos' : 'Importar seleccionados'}
               </button>
               <button type="button" className="small" onClick={() => setPreview([])}>
                 Cancelar
@@ -234,6 +299,25 @@ export function ImportPanel() {
             </table>
           </div>
         </div>
+      ) : null}
+      {match ? (
+        <PriceMatchReview
+          items={existing.map((i) => ({
+            id: i.id,
+            description: i.description,
+            unit: i.unit,
+            quantity: i.quantity,
+            group: i.group ?? null,
+            clientRef: i.clientRef ?? null,
+            unitPrice: i.unitPrice,
+            currency: i.currency,
+          }))}
+          rows={match.rows}
+          initial={match.result}
+          document={docName || 'cotización de proveedor'}
+          onApply={applyPrices}
+          onCancel={() => setMatch(null)}
+        />
       ) : null}
     </div>
   );

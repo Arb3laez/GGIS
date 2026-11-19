@@ -11,7 +11,6 @@
     "typecheck": "tsc -p ."
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.133.0",
     "@ggis/domain": "*",
     "cors": "^2.8.5",
     "express": "^5.1.0",

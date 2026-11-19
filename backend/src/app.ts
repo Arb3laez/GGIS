@@ -19,7 +19,8 @@ import { catalogRouter } from './modules/catalog/catalog.routes';
 import { CatalogService } from './modules/catalog/catalog.service';
 import { exchangeRateRouter } from './modules/exchange-rate/exchange-rate.routes';
 import { ExchangeRateService, type FetchFn } from './modules/exchange-rate/exchange-rate.service';
-import { createAiExtractor, type AiExtractor } from './modules/imports/ai-extractor';
+import type { AiExtractor } from './modules/imports/ai-extractor';
+import { createDocumentAi } from './modules/imports/document-ai';
 import { createClientResearcher, type ClientResearcher } from './modules/research/client-researcher';
 import { researchRouter } from './modules/research/research.routes';
 import { WebFetcher } from './modules/research/web-photos';
@@ -58,7 +59,7 @@ export function createApp({
     log.info({ cotizaciones: refreshed }, 'Totales del listado recalculados con el motor actual');
   const settings = new SettingsService(db);
   const attachments = new AttachmentsService(db, config.attachmentsDir);
-  const imports = new ImportsService(aiExtractor ?? createAiExtractor(config.ai, log), attachments, log);
+  const imports = new ImportsService(aiExtractor ?? createDocumentAi(config, log), attachments, log);
   const exchangeRate = new ExchangeRateService(config.exchangeRateTtlMs, log, fetchFn);
   const backup = new BackupService(quotes, attachments, log);
 

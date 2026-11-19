@@ -61,7 +61,7 @@ Errores: siempre `{"error": {"code", "message", "details?"}}`, con códigos HTTP
 
 ## Seguridad
 
-- La llave de la IA (`ANTHROPIC_API_KEY`) vive **solo** en el servidor (variable de entorno). El navegador nunca la ve.
+- La llave de la IA (`OPENAI_API_KEY`) vive **solo** en el servidor (variable de entorno). El navegador nunca la ve.
 - Por defecto la API escucha en `127.0.0.1` (solo este equipo). **No hay autenticación de usuarios todavía**: antes de exponerla en red, pon un proxy con autenticación (SSO corporativo) o agrega el módulo de autenticación (ver pendientes en el README).
 - Validación con zod en toda entrada, cabeceras de seguridad con helmet (CSP), CORS restringido, límite de tamaño de archivos, límite de frecuencia en la lectura con IA, detección del tipo real de los archivos y nombres en disco sin datos del usuario.
 - El repositorio **no contiene datos de clientes**. La v68 traía 28 cotizaciones reales embebidas; aquí se cargan solo importando un respaldo, y `data/` y los respaldos `.json` están en `.gitignore`.

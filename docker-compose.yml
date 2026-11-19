@@ -8,8 +8,6 @@ services:
       # Puerto en este equipo: GGIS_PORT (por defecto 4000). Ej: GGIS_PORT=8080 si el 4000 está ocupado.
       - "127.0.0.1:${GGIS_PORT:-4000}:4000"
     environment:
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5-5}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5}
       OPENAI_IMAGE_MODEL: ${OPENAI_IMAGE_MODEL:-gpt-image-1.5}

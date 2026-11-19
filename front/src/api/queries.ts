@@ -11,7 +11,10 @@ import type {
   Dashboard,
   ExchangeRateInfo,
   HistoricalRecommendation,
+  ImportedRow,
   ImportPreview,
+  MatchTargetItem,
+  PriceMatchResult,
   Quote,
   QuoteDraft,
   QuoteStatus,
@@ -158,6 +161,9 @@ export const importsApi = {
   document: (file: File, quoteId: string | null) =>
     http.upload<ImportPreview>('/api/imports/document', file, quoteId ? { quoteId } : {}),
   text: (text: string) => http.post<ImportPreview>('/api/imports/text', { text }),
+  /** Relaciona las líneas del proveedor con los ítems existentes (no crea ítems). */
+  match: (items: MatchTargetItem[], rows: ImportedRow[]) =>
+    http.post<PriceMatchResult>('/api/imports/match', { items, rows }),
 };
 
 // ---------- TRM ----------

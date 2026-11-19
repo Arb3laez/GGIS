@@ -373,6 +373,36 @@ describe('importación', () => {
       .expect(400);
     expect(res.body.error.code).toBe('bad_request');
   });
+
+  it('asocia precios del proveedor a los ítems existentes y reporta lo que no relaciona', async () => {
+    const res = await request(app)
+      .post('/api/imports/match')
+      .send({
+        items: [
+          { id: 'a', description: 'Estacion Manual', unit: 'Und', quantity: 6, clientRef: '5' },
+          { id: 'b', description: 'Panel de detencion', unit: 'Und', quantity: 1, clientRef: '23' },
+        ],
+        rows: [
+          {
+            description: 'Estación manual de doble acción',
+            unit: 'UN',
+            quantity: 6,
+            currency: 'COP',
+            unitPrice: 120732,
+          },
+          { description: 'Cámara domo IP', unit: 'UN', quantity: 2, currency: 'COP', unitPrice: 350000 },
+        ],
+      })
+      .expect(200);
+    expect(res.body.method).toBe('rules');
+    expect(res.body.items[0]).toMatchObject({ itemId: 'a', status: 'ok', unitPrice: 120732 });
+    expect(res.body.items[1]).toMatchObject({ itemId: 'b', status: 'none' });
+    expect(res.body.unmatchedRows).toEqual([{ row: 1, reason: expect.stringMatching(/No se identificó/) }]);
+  });
+
+  it('rechaza una asociación sin ítems', async () => {
+    await request(app).post('/api/imports/match').send({ items: [], rows: [] }).expect(422);
+  });
 });
 
 describe('respaldo', () => {

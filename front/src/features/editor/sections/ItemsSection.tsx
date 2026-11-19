@@ -249,6 +249,24 @@ export function ItemsSection() {
                         + Detalle / notas para la oferta
                       </button>
                     )}
+                    {it.clientRef || it.group || it.priceSources?.length ? (
+                      <div
+                        className="hint"
+                        title={it.priceSources
+                          ?.map((s) => `${s.reference ? `${s.reference} · ` : ''}${s.description}`)
+                          .join('\n')}
+                      >
+                        {[
+                          it.clientRef ? `Ítem cliente #${it.clientRef}` : '',
+                          it.group ?? '',
+                          it.priceSources?.length
+                            ? `precio: ${it.priceSources[0]!.document}${it.priceSources.length > 1 ? ` (${it.priceSources.length} líneas)` : ''}`
+                            : '',
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </div>
+                    ) : null}
                   </td>
                   <td>
                     <input

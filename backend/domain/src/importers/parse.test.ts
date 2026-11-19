@@ -39,6 +39,22 @@ describe('parseSheetRows', () => {
     expect(rows[0]).toMatchObject({ description: 'Cámara bala IP 4MP', quantity: 10, unitPrice: 183200, currency: 'COP' });
   });
 
+  it('formato de licitación: nº de ítem del cliente y grupos por torre', () => {
+    const rows = parseSheetRows([
+      ['PROPUESTA ECONÓMICA'],
+      ['Item', 'Descripción', 'Unidad', 'Cantidad'],
+      [],
+      ['', 'TORRE MAR'],
+      [1, 'Adaptador Terminal Ø 3/4"', 'Und', 444],
+      [2, 'Fuente auxiliar', 'Und', 1],
+      ['', 'TORRE SIERRA'],
+      [14, 'Adaptador Terminal Ø 3/4"', 'Und', 368],
+    ]);
+    expect(rows).toHaveLength(3);
+    expect(rows[0]).toMatchObject({ clientRef: '1', group: 'TORRE MAR', quantity: 444, unitPrice: 0 });
+    expect(rows[2]).toMatchObject({ clientRef: '14', group: 'TORRE SIERRA', quantity: 368 });
+  });
+
   it('lista del cliente sin precios', () => {
     const rows = parseSheetRows([['Descripción'], ['Detector de humo'], ['Sirena estrobo']]);
     expect(rows.map((r) => r.unitPrice)).toEqual([0, 0]);

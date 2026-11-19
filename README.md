@@ -38,7 +38,7 @@ Los datos quedan en `backend/data/` (base SQLite y adjuntos). Esa carpeta no se 
 
 ### Lectura de cotizaciones de proveedor con IA (opcional)
 
-Define `ANTHROPIC_API_KEY` en `.env` (nunca en el código ni en el navegador). Sin la llave, la importación de PDF usa el lector de texto del PDF y las imágenes quedan solo como adjunto.
+Usa la misma `OPENAI_API_KEY` de la investigación de clientes (en `.env`, nunca en el código ni en el navegador) y el modelo de `OPENAI_MODEL`. Con la llave, la IA lee el PDF o la imagen del proveedor y relaciona sus líneas con los ítems de la cotización ("Asociar precios a ítems existentes"). Sin la llave, la importación de PDF usa el lector de texto del PDF, la asociación usa reglas y las imágenes quedan solo como adjunto.
 
 ### Logos
 

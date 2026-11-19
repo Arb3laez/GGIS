@@ -4,6 +4,7 @@ import { createApp } from './app';
 import { loadConfig } from './config';
 import { openDatabase } from './db/database';
 import { createLogger } from './lib/logger';
+import { documentAiProvider } from './modules/imports/document-ai';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,7 +22,7 @@ function main() {
       {
         url: `http://${config.host}:${config.port}`,
         data: config.dataDir,
-        ai: !!config.ai.apiKey,
+        ai: documentAiProvider(config) ?? false,
         web: !!webDistDir,
       },
       'Cotizador GGIS listo',

@@ -12,5 +12,6 @@ export * from './closure/closure';
 export * from './closure/audit';
 export * from './analytics/dashboard';
 export * from './importers/parse';
+export * from './importers/match';
 export * from './legacy/fromLegacy';
 export * from './legacy/compat';
